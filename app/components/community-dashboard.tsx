@@ -3,6 +3,7 @@ import { ResidentProfiles } from "./resident-profiles";
 import { MessageBoard } from "./message-board";
 import { EventsCalendar } from "./events-calendar";
 import { Resources } from "./resources";
+import { Toaster } from "./ui/sonner";
 
 export function CommunityDashboard() {
   return (
@@ -49,6 +50,7 @@ export function CommunityDashboard() {
           </section>
         </div>
       </main>
+      <Toaster />
     </div>
   );
 }
