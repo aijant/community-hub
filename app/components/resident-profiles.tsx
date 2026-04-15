@@ -22,16 +22,8 @@ import {
 import { supabase, supabaseConfigured } from "../lib/supabase-client";
 
 const CAROUSEL_AUTOPLAY_MS = 4500;
-/** Poll interval while waiting for get_community_profiles to include the new row. */
-const PROFILE_LIST_POLL_INTERVAL_MS = 5_000;
-/** Max time to poll before final refresh anyway (page reload). */
-const PROFILE_LIST_POLL_MAX_MS = 120_000;
-
-/*
- * If pagination.total never increases after Add Profile, the issue is usually server-side:
- * confirm parse-linkedin persists with save_profile, get_community_profiles reads the same table/view,
- * and RLS allows anon to SELECT new rows.
- */
+/** Full page reload after Add Profile (delay before reload). */
+const ADD_PROFILE_FULL_RELOAD_DELAY_MS = 10_000;
 
 const COMMUNITY_PROFILES_URL =
   "https://ksxqwsihrizusoxorrcn.supabase.co/functions/v1/get_community_profiles";
@@ -119,7 +111,6 @@ export function ResidentProfiles() {
   const [addOpen, setAddOpen] = useState(false);
   const [linkedinUrlInput, setLinkedinUrlInput] = useState("");
   const [addSubmitting, setAddSubmitting] = useState(false);
-  const [profileListSyncing, setProfileListSyncing] = useState(false);
 
   const lastListTotalRef = useRef<number | null>(null);
 
@@ -185,46 +176,17 @@ export function ResidentProfiles() {
         return;
       }
 
-      const baselineTotal = lastListTotalRef.current ?? profiles.length;
-
       toast.success(toastMessageFromPayload(data), {
         description:
-          "The resident list updates when your profile appears on the server. This page will reload automatically—please keep this tab open.",
+          "The page will reload automatically in about 10 seconds so the resident list can update. Please keep this tab open.",
       });
       setAddOpen(false);
       setLinkedinUrlInput("");
       setAddSubmitting(false);
-      setProfileListSyncing(true);
 
-      try {
-        await loadProfiles({ silent: true });
-
-        const pollDeadline = Date.now() + PROFILE_LIST_POLL_MAX_MS;
-        let seenNewTotal = false;
-        while (Date.now() < pollDeadline) {
-          await new Promise((r) => window.setTimeout(r, PROFILE_LIST_POLL_INTERVAL_MS));
-          const polled = await fetchCommunityProfilesJson();
-          const total = polled.pagination?.total ?? (polled.profiles?.length ?? 0);
-          if (total > baselineTotal) {
-            const list = polled.profiles ?? [];
-            lastListTotalRef.current = total;
-            setProfiles(list.map((api, index) => mapApiProfileToProfile(api, index)));
-            seenNewTotal = true;
-            break;
-          }
-        }
-
-        if (!seenNewTotal) {
-          await loadProfiles({ silent: true });
-        }
-
+      window.setTimeout(() => {
         window.location.reload();
-      } catch (syncErr) {
-        setProfileListSyncing(false);
-        toast.error(
-          syncErr instanceof Error ? syncErr.message : "Could not refresh the resident list.",
-        );
-      }
+      }, ADD_PROFILE_FULL_RELOAD_DELAY_MS);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not add profile.");
     } finally {
@@ -311,16 +273,6 @@ export function ResidentProfiles() {
           </Dialog>
         </div>
       </div>
-
-      {profileListSyncing ? (
-        <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-950">
-          <Loader2 className="w-4 h-4 shrink-0 animate-spin mt-0.5" aria-hidden />
-          <p>
-            Syncing the resident list with the server. This can take up to two minutes. The page will
-            refresh automatically.
-          </p>
-        </div>
-      ) : null}
 
       {profilesError && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
