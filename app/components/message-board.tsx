@@ -1,25 +1,49 @@
-import { useState } from "react";
-import { Pin, MessageSquare, Link2, AlertCircle, Lightbulb, FileText, Send, MoreVertical, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Pin,
+  MessageSquare,
+  Link2,
+  AlertCircle,
+  Lightbulb,
+  FileText,
+  Send,
+  MoreVertical,
+  Trash2,
+  Pencil,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Textarea } from "./ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { cn } from "./ui/utils";
-
-type PostCategory = "announcement" | "tip" | "rule" | "link" | "general";
-
-interface Post {
-  id: string;
-  author: string;
-  avatar: string;
-  content: string;
-  category: PostCategory;
-  timestamp: Date;
-  isPinned: boolean;
-  whatsappIntegration?: boolean;
-}
+import { supabaseConfigured } from "../lib/supabase-client";
+import type { PostCategory } from "../lib/community-post-types";
+import { DEFAULT_POST_CHANNEL } from "../lib/community-post-types";
+import type { BoardPostView } from "../lib/community-posts";
+import {
+  createCommunityPost,
+  deleteCommunityPost,
+  editCommunityPost,
+  fetchCommunityPosts,
+} from "../lib/community-posts";
+import { useCommunityProfiles } from "../context/community-profiles-context";
+import { useAuthRole } from "../hooks/use-auth-role";
 
 const categoryConfig = {
   announcement: { label: "Announcement", icon: AlertCircle, color: "bg-red-100 text-red-700" },
@@ -27,103 +51,178 @@ const categoryConfig = {
   rule: { label: "Rule", icon: FileText, color: "bg-blue-100 text-blue-700" },
   link: { label: "Link", icon: Link2, color: "bg-purple-100 text-purple-700" },
   general: { label: "General", icon: MessageSquare, color: "bg-gray-100 text-gray-700" },
-};
+} as const;
 
 export function MessageBoard() {
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: "1",
-      author: "Sarah Chen",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop",
-      content: "🏠 House Meeting this Sunday at 6 PM in the common area. Important updates to discuss!",
-      category: "announcement",
-      timestamp: new Date(2026, 3, 2, 14, 30),
-      isPinned: true,
-      whatsappIntegration: true,
-    },
-    {
-      id: "2",
-      author: "Marcus Williams",
-      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop",
-      content: "💡 Label your food in the fridge with your name and date. Keeps things organized!",
-      category: "tip",
-      timestamp: new Date(2026, 3, 1, 10, 15),
-      isPinned: true,
-    },
-    {
-      id: "3",
-      author: "Priya Patel",
-      avatar: "https://images.unsplash.com/photo-1534751516642-a1af1ef26a56?w=400&h=400&fit=crop",
-      content: "📋 Quiet hours: 10 PM - 8 AM on weekdays. Please be mindful of noise levels.",
-      category: "rule",
-      timestamp: new Date(2026, 3, 1, 9, 0),
-      isPinned: true,
-    },
-    {
-      id: "4",
-      author: "Sarah Chen",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=400&fit=crop",
-      content: "Anyone want to start a weekly board game night? Thinking Thursdays at 7 PM?",
-      category: "general",
-      timestamp: new Date(2026, 3, 4, 11, 20),
-      isPinned: false,
-      whatsappIntegration: true,
-    },
-  ]);
+  const { rows, loading: profilesLoading, error: profilesError, reload: reloadProfiles } =
+    useCommunityProfiles();
+
+  const { user, loading: authLoading, error: roleError, canPin, canModerate } = useAuthRole();
+
+  const profileLookup = useMemo(
+    () => rows.map((r) => ({ id: r.id, name: r.name, avatar: r.avatar })),
+    [rows],
+  );
+
+  const selectedAuthorId = useMemo(() => rows[0]?.id ?? "", [rows]);
+
+  const [posts, setPosts] = useState<BoardPostView[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postsError, setPostsError] = useState<string | null>(null);
 
   const [newPost, setNewPost] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<PostCategory>("general");
+  const [submitting, setSubmitting] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editPost, setEditPost] = useState<BoardPostView | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [editCategory, setEditCategory] = useState<PostCategory>("general");
+  const [editSaving, setEditSaving] = useState(false);
+
+  const loadPosts = useCallback(async () => {
+    if (!supabaseConfigured) return;
+    setPostsLoading(true);
+    setPostsError(null);
+    try {
+      const list = await fetchCommunityPosts(profileLookup);
+      setPosts(list);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not load posts.";
+      setPostsError(msg);
+      setPosts([]);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, [profileLookup]);
+
+  useEffect(() => {
+    if (!supabaseConfigured || profilesLoading) return;
+    void loadPosts();
+  }, [loadPosts, profilesLoading]);
 
   const pinnedPosts = posts.filter((post) => post.isPinned);
   const regularPosts = posts.filter((post) => !post.isPinned);
 
-  const handleAddPost = () => {
-    if (!newPost.trim()) return;
-
-    const post: Post = {
-      id: Date.now().toString(),
-      author: "You",
-      avatar: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=400&fit=crop",
-      content: newPost,
-      category: selectedCategory,
-      timestamp: new Date(),
-      isPinned: false,
-    };
-
-    setPosts([post, ...posts]);
-    setNewPost("");
-    setSelectedCategory("general");
+  const openEdit = (post: BoardPostView) => {
+    setEditPost(post);
+    setEditContent(post.content);
+    setEditCategory(post.category);
+    setEditOpen(true);
   };
 
-  const togglePin = (id: string) => {
-    setPosts(posts.map((post) => (post.id === id ? { ...post, isPinned: !post.isPinned } : post)));
+  const handleAddPost = async () => {
+    if (!newPost.trim() || !selectedAuthorId || !supabaseConfigured || !user) return;
+    setSubmitting(true);
+    try {
+      await createCommunityPost({
+        content: newPost.trim(),
+        category: selectedCategory,
+        authorId: selectedAuthorId,
+        channel: DEFAULT_POST_CHANNEL,
+        isPinned: false,
+      });
+      toast.success("Post published.");
+      setNewPost("");
+      setSelectedCategory("general");
+      await loadPosts();
+      void reloadProfiles({ silent: true });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create post.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const deletePost = (id: string) => {
-    setPosts(posts.filter((post) => post.id !== id));
+  const handleDeletePost = async (postId: string) => {
+    if (!supabaseConfigured) return;
+    try {
+      await deleteCommunityPost(postId);
+      toast.success("Post deleted.");
+      await loadPosts();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete post.");
+    }
   };
 
-  const renderPost = (post: Post, compact = false) => {
+  const handleTogglePin = async (post: BoardPostView) => {
+    if (!canPin || !supabaseConfigured) return;
+    try {
+      await editCommunityPost({
+        postId: post.id,
+        content: post.content,
+        category: post.category,
+        channel: post.channel || DEFAULT_POST_CHANNEL,
+        isPinned: !post.isPinned,
+      });
+      toast.success(post.isPinned ? "Unpinned." : "Pinned.");
+      await loadPosts();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update pin.");
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editPost || !editContent.trim() || !supabaseConfigured) return;
+    setEditSaving(true);
+    try {
+      await editCommunityPost({
+        postId: editPost.id,
+        content: editContent.trim(),
+        category: editCategory,
+        channel: editPost.channel || DEFAULT_POST_CHANNEL,
+        isPinned: editPost.isPinned,
+      });
+      toast.success("Post updated.");
+      setEditOpen(false);
+      setEditPost(null);
+      await loadPosts();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save post.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const renderPost = (post: BoardPostView, compact = false) => {
     const config = categoryConfig[post.category];
     const Icon = config.icon;
+    const isOwnerByAuth = Boolean(
+      user?.id && post.createdByUserId && post.createdByUserId === user.id,
+    );
+    const showPin = canPin;
+    const showEditDelete = canModerate || isOwnerByAuth;
+    const showMenu = showPin || showEditDelete;
+
+    const whatsappIntegration = post.channel.trim().toLowerCase() === "whatsapp";
 
     return (
-      <div key={post.id} className={cn("p-3 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-100 last:border-0", compact && "p-2")}>
+      <div
+        key={post.id}
+        className={cn(
+          "p-3 hover:bg-gray-50 rounded-lg transition-colors border-b border-gray-100 last:border-0",
+          compact && "p-2",
+        )}
+      >
         <div className="flex items-start gap-2">
           <Avatar className={cn("w-8 h-8", compact && "w-6 h-6")}>
-            <AvatarImage src={post.avatar} alt={post.author} />
-            <AvatarFallback className="text-xs">{post.author[0]}</AvatarFallback>
+            <AvatarImage src={post.avatar} alt={post.authorName} />
+            <AvatarFallback className="text-xs">
+              {post.authorName.trim() ? post.authorName[0] : "?"}
+            </AvatarFallback>
           </Avatar>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={cn("font-medium text-gray-900", compact && "text-sm")}>{post.author}</span>
+                <span className={cn("font-medium text-gray-900", compact && "text-sm")}>
+                  {post.authorName}
+                </span>
                 <Badge variant="secondary" className={cn("gap-1 text-xs h-5", config.color)}>
                   <Icon className="w-3 h-3" />
                   {config.label}
                 </Badge>
-                {post.whatsappIntegration && (
+                {whatsappIntegration && (
                   <Badge variant="outline" className="text-xs h-5 gap-1">
                     <MessageSquare className="w-2.5 h-2.5" />
                     WhatsApp
@@ -131,23 +230,38 @@ export function MessageBoard() {
                 )}
               </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <MoreVertical className="w-3.5 h-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => togglePin(post.id)}>
-                    <Pin className="w-4 h-4 mr-2" />
-                    {post.isPinned ? "Unpin" : "Pin"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => deletePost(post.id)} className="text-red-600">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {showMenu ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {showPin ? (
+                      <DropdownMenuItem onClick={() => void handleTogglePin(post)}>
+                        <Pin className="w-4 h-4 mr-2" />
+                        {post.isPinned ? "Unpin" : "Pin"}
+                      </DropdownMenuItem>
+                    ) : null}
+                    {showEditDelete ? (
+                      <DropdownMenuItem onClick={() => openEdit(post)}>
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                    ) : null}
+                    {showEditDelete ? (
+                      <DropdownMenuItem
+                        onClick={() => void handleDeletePost(post.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
             </div>
 
             <p className={cn("text-sm text-gray-700 mt-1", compact && "text-xs")}>{post.content}</p>
@@ -166,13 +280,42 @@ export function MessageBoard() {
     );
   };
 
+  const composerDisabled =
+    !supabaseConfigured ||
+    profilesLoading ||
+    authLoading ||
+    rows.length === 0 ||
+    !selectedAuthorId ||
+    !user;
+
   return (
     <div className="space-y-4">
-      {/* Section Header */}
       <div className="flex items-center gap-2">
         <MessageSquare className="w-5 h-5 text-gray-700" />
         <h2 className="text-lg font-semibold text-gray-900">Message Board</h2>
       </div>
+
+      {!supabaseConfigured ? (
+        <p className="text-sm text-gray-600 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+          Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to load and publish posts.
+        </p>
+      ) : null}
+
+      {supabaseConfigured && !authLoading && !user ? (
+        <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+          Sign in to create posts.
+        </p>
+      ) : null}
+
+      {roleError && user ? (
+        <p className="text-sm text-amber-800 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+          Could not load your role ({roleError}). Pin and moderation actions may be unavailable.
+        </p>
+      ) : null}
+
+      {profilesError ? (
+        <p className="text-sm text-red-700">Profiles could not load; add residents to post as an author.</p>
+      ) : null}
 
       {/* Create Post */}
       <Card className="p-4 bg-white border border-gray-200">
@@ -182,6 +325,7 @@ export function MessageBoard() {
             value={newPost}
             onChange={(e) => setNewPost(e.target.value)}
             className="min-h-[80px] resize-none text-sm"
+            disabled={composerDisabled}
           />
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex gap-1.5 flex-wrap">
@@ -191,10 +335,12 @@ export function MessageBoard() {
                 return (
                   <Button
                     key={category}
+                    type="button"
                     variant={selectedCategory === category ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedCategory(category)}
                     className="gap-1.5 h-8 text-xs"
+                    disabled={composerDisabled}
                   >
                     <Icon className="w-3 h-3" />
                     {config.label}
@@ -202,13 +348,35 @@ export function MessageBoard() {
                 );
               })}
             </div>
-            <Button onClick={handleAddPost} disabled={!newPost.trim()} size="sm" className="gap-2">
-              <Send className="w-3.5 h-3.5" />
+            <Button
+              type="button"
+              onClick={() => void handleAddPost()}
+              disabled={composerDisabled || !newPost.trim() || submitting}
+              size="sm"
+              className="gap-2"
+            >
+              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               Post
             </Button>
           </div>
         </div>
       </Card>
+
+      {postsError ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <span>{postsError}</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => void loadPosts()}>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
+      {postsLoading && posts.length === 0 ? (
+        <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-600">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          Loading posts…
+        </div>
+      ) : null}
 
       {/* Pinned Posts */}
       {pinnedPosts.length > 0 && (
@@ -227,19 +395,66 @@ export function MessageBoard() {
 
       {/* Recent Posts */}
       <Card className="bg-white border border-gray-200">
-        <div className="p-3 border-b border-gray-200">
+        <div className="p-3 border-b border-gray-200 flex items-center justify-between gap-2">
           <h3 className="font-semibold text-gray-900 text-sm">Recent</h3>
+          {supabaseConfigured && !postsLoading ? (
+            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => void loadPosts()}>
+              Refresh
+            </Button>
+          ) : null}
         </div>
         <div className="max-h-[400px] overflow-y-auto">
           {regularPosts.length > 0 ? (
             <div>{regularPosts.map((post) => renderPost(post))}</div>
-          ) : (
+          ) : !postsLoading && !postsError ? (
             <div className="p-8 text-center text-sm text-gray-500">
               No posts yet. Be the first to share something!
             </div>
-          )}
+          ) : null}
         </div>
       </Card>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit post</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="min-h-[100px] text-sm"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(categoryConfig) as PostCategory[]).map((category) => {
+                const config = categoryConfig[category];
+                const Icon = config.icon;
+                return (
+                  <Button
+                    key={category}
+                    type="button"
+                    variant={editCategory === category ? "default" : "outline"}
+                    size="sm"
+                    className="gap-1 h-8 text-xs"
+                    onClick={() => setEditCategory(category)}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {config.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void handleSaveEdit()} disabled={editSaving || !editContent.trim()}>
+              {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

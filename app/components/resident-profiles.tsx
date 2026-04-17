@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Linkedin, Loader2, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -20,72 +20,12 @@ import {
   CarouselItem,
 } from "./ui/carousel";
 import { supabase, supabaseConfigured } from "../lib/supabase-client";
+import { useCommunityProfiles } from "../context/community-profiles-context";
+import { useAuthRole } from "../hooks/use-auth-role";
 
 const CAROUSEL_AUTOPLAY_MS = 4500;
 /** Full page reload after Add Profile (delay before reload). */
-const ADD_PROFILE_FULL_RELOAD_DELAY_MS = 10_000;
-
-const COMMUNITY_PROFILES_URL =
-  "https://ksxqwsihrizusoxorrcn.supabase.co/functions/v1/get_community_profiles";
-
-interface Profile {
-  id: string;
-  name: string;
-  linkedinUrl: string;
-  bio: string;
-  title: string;
-  avatar: string;
-  room: string;
-}
-
-interface ApiProfile {
-  id: string | null;
-  name: string | null;
-  position: string | null;
-  description: string | null;
-  room: string | null;
-  linkedin_url: string | null;
-  avatar_url: string | null;
-}
-
-interface CommunityProfilesResponse {
-  profiles: ApiProfile[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    total_pages: number;
-    has_next: boolean;
-    has_prev: boolean;
-  };
-}
-
-async function fetchCommunityProfilesJson(): Promise<CommunityProfilesResponse> {
-  const url = `${COMMUNITY_PROFILES_URL}?_=${Date.now()}`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to load profiles (${res.status})`);
-  }
-  return res.json();
-}
-
-function formatRoom(room: string | null | undefined): string {
-  const r = room?.trim();
-  if (!r) return "—";
-  return r.startsWith("Room ") ? r : `Room ${r}`;
-}
-
-function mapApiProfileToProfile(api: ApiProfile, index: number): Profile {
-  return {
-    id: api.id ?? `profile-${index}`,
-    name: api.name ?? "",
-    linkedinUrl: api.linkedin_url ?? "",
-    bio: api.description ?? "",
-    title: api.position ?? "",
-    avatar: api.avatar_url ?? "",
-    room: formatRoom(api.room),
-  };
-}
+const ADD_PROFILE_FULL_RELOAD_DELAY_MS = 5_000;
 
 function linkedinHref(linkedinUrl: string): string {
   const t = linkedinUrl.trim();
@@ -104,40 +44,13 @@ function toastMessageFromPayload(data: unknown): string {
 }
 
 export function ResidentProfiles() {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [profilesLoading, setProfilesLoading] = useState(true);
-  const [profilesError, setProfilesError] = useState<string | null>(null);
+  const { rows: profiles, loading: profilesLoading, error: profilesError, reload: loadProfiles } =
+    useCommunityProfiles();
+  const { user, isClient } = useAuthRole();
 
   const [addOpen, setAddOpen] = useState(false);
   const [linkedinUrlInput, setLinkedinUrlInput] = useState("");
   const [addSubmitting, setAddSubmitting] = useState(false);
-
-  const lastListTotalRef = useRef<number | null>(null);
-
-  const loadProfiles = useCallback(async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false;
-    if (!silent) {
-      setProfilesLoading(true);
-    }
-    setProfilesError(null);
-    try {
-      const data = await fetchCommunityProfilesJson();
-      const list = data.profiles ?? [];
-      lastListTotalRef.current = data.pagination?.total ?? list.length;
-      setProfiles(list.map((api, index) => mapApiProfileToProfile(api, index)));
-    } catch (e) {
-      setProfilesError(e instanceof Error ? e.message : "Could not load resident profiles.");
-      setProfiles([]);
-    } finally {
-      if (!silent) {
-        setProfilesLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadProfiles();
-  }, [loadProfiles]);
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const pauseAutoplayRef = useRef(false);
@@ -310,21 +223,34 @@ export function ResidentProfiles() {
             className="w-full"
           >
             <CarouselContent className="-ml-3">
-              {profiles.map((profile) => (
+              {profiles.map((profile) => {
+                const showClientBadge = Boolean(
+                  isClient && user && profile.id === user.id,
+                );
+                return (
                 <CarouselItem
                   key={profile.id}
                   className="pl-3 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4"
                 >
                   <Card className="p-4 hover:shadow-md transition-shadow bg-white border border-gray-200 h-full">
                     <div className="flex flex-col items-center text-center space-y-3">
-                      <Avatar className="w-16 h-16">
-                        <AvatarImage src={profile.avatar} alt={profile.name} />
-                        <AvatarFallback>
-                          {profile.name.trim()
-                            ? profile.name.split(/\s+/).map((n) => n[0]).join("")
-                            : "?"}
-                        </AvatarFallback>
-                      </Avatar>
+                      <div className="relative shrink-0">
+                        <Avatar className="w-16 h-16">
+                          <AvatarImage src={profile.avatar} alt={profile.name} />
+                          <AvatarFallback>
+                            {profile.name.trim()
+                              ? profile.name.split(/\s+/).map((n) => n[0]).join("")
+                              : "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        {showClientBadge ? (
+                          <span
+                            className="absolute bottom-0 right-0 block h-3.5 w-3.5 rounded-full bg-green-500 ring-2 ring-white"
+                            title="Signed in"
+                            aria-label="Signed in"
+                          />
+                        ) : null}
+                      </div>
 
                       <div className="space-y-1 w-full">
                         <h3 className="font-semibold text-gray-900 text-sm">{profile.name}</h3>
@@ -348,7 +274,8 @@ export function ResidentProfiles() {
                     </div>
                   </Card>
                 </CarouselItem>
-              ))}
+                );
+              })}
             </CarouselContent>
           </Carousel>
         </div>

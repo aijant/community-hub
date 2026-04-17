@@ -1,4 +1,5 @@
 import { Pin } from "lucide-react";
+import { CommunityProfilesProvider } from "../context/community-profiles-context";
 import { ResidentProfiles } from "./resident-profiles";
 import { MessageBoard } from "./message-board";
 import { EventsCalendar } from "./events-calendar";
@@ -7,6 +8,7 @@ import { Toaster } from "./ui/sonner";
 
 export function CommunityDashboard() {
   return (
+    <CommunityProfilesProvider>
     <div className="min-h-screen bg-[#f7f6f3]">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -52,5 +54,6 @@ export function CommunityDashboard() {
       </main>
       <Toaster />
     </div>
+    </CommunityProfilesProvider>
   );
 }
