@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Linkedin, Loader2, Plus, Users } from "lucide-react";
+import { Linkedin, Loader2, Plus, RefreshCw, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -24,8 +24,6 @@ import { useCommunityProfiles } from "../context/community-profiles-context";
 import { useAuthRole } from "../hooks/use-auth-role";
 
 const CAROUSEL_AUTOPLAY_MS = 4500;
-/** Full page reload after Add Profile (delay before reload). */
-const ADD_PROFILE_FULL_RELOAD_DELAY_MS = 5_000;
 
 function linkedinHref(linkedinUrl: string): string {
   const t = linkedinUrl.trim();
@@ -51,6 +49,7 @@ export function ResidentProfiles() {
   const [addOpen, setAddOpen] = useState(false);
   const [linkedinUrlInput, setLinkedinUrlInput] = useState("");
   const [addSubmitting, setAddSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const pauseAutoplayRef = useRef(false);
@@ -66,6 +65,11 @@ export function ResidentProfiles() {
     const id = window.setInterval(tick, CAROUSEL_AUTOPLAY_MS);
     return () => window.clearInterval(id);
   }, [carouselApi, profiles.length]);
+
+  const handleRefreshProfiles = () => {
+    setRefreshing(true);
+    void loadProfiles({ silent: true }).finally(() => setRefreshing(false));
+  };
 
   const handleAddProfile = async () => {
     const linkedinUrl = linkedinUrlInput.trim();
@@ -90,16 +94,11 @@ export function ResidentProfiles() {
       }
 
       toast.success(toastMessageFromPayload(data), {
-        description:
-          "The page will reload automatically in about 10 seconds so the resident list can update. Please keep this tab open.",
+        description: "Updating the resident list…",
       });
       setAddOpen(false);
       setLinkedinUrlInput("");
-      setAddSubmitting(false);
-
-      window.setTimeout(() => {
-        window.location.reload();
-      }, ADD_PROFILE_FULL_RELOAD_DELAY_MS);
+      void loadProfiles({ silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not add profile.");
     } finally {
@@ -120,6 +119,22 @@ export function ResidentProfiles() {
               Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to add profiles.
             </span>
           ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="shrink-0 px-2"
+            onClick={() => handleRefreshProfiles()}
+            disabled={refreshing}
+            aria-label="Refresh resident list"
+            title="Refresh resident list"
+          >
+            {refreshing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+          </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button
