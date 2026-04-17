@@ -1,4 +1,5 @@
 import { Pin } from "lucide-react";
+import { AuthRoleProvider } from "../context/auth-role-context";
 import { CommunityProfilesProvider } from "../context/community-profiles-context";
 import { ResidentProfiles } from "./resident-profiles";
 import { MessageBoard } from "./message-board";
@@ -8,6 +9,7 @@ import { Toaster } from "./ui/sonner";
 
 export function CommunityDashboard() {
   return (
+    <AuthRoleProvider>
     <CommunityProfilesProvider>
     <div className="min-h-screen bg-[#f7f6f3]">
       {/* Header */}
@@ -55,5 +57,6 @@ export function CommunityDashboard() {
       <Toaster />
     </div>
     </CommunityProfilesProvider>
+    </AuthRoleProvider>
   );
 }
