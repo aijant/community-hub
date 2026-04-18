@@ -191,11 +191,54 @@ export async function deleteCommunityEvent(eventId: string) {
 }
 
 export async function joinCommunityEvent(eventId: string) {
-  const { error } = await supabase.rpc("join_community_event", { p_event_id: eventId });
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw new Error(formatDbError(authErr, "Could not join event."));
+  const user = authData?.user;
+  if (!user) throw new Error("Sign in to join an event.");
+
+  const { data: row, error: fetchErr } = await supabase
+    .from("community_events")
+    .select("attendees")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (fetchErr) throw new Error(formatDbError(fetchErr, "Could not join event."));
+  if (!row) throw new Error("Event not found.");
+
+  const current = pickAttendees((row as { attendees?: unknown }).attendees) ?? [];
+  if (current.includes(user.id)) return;
+
+  const { error } = await supabase
+    .from("community_events")
+    .update({ attendees: [...current, user.id] })
+    .eq("id", eventId);
+
   if (error) throw new Error(formatDbError(error, "Could not join event."));
 }
 
 export async function leaveCommunityEvent(eventId: string) {
-  const { error } = await supabase.rpc("leave_community_event", { p_event_id: eventId });
+  const { data: authData, error: authErr } = await supabase.auth.getUser();
+  if (authErr) throw new Error(formatDbError(authErr, "Could not leave event."));
+  const user = authData?.user;
+  if (!user) throw new Error("Sign in to leave an event.");
+
+  const { data: row, error: fetchErr } = await supabase
+    .from("community_events")
+    .select("attendees")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (fetchErr) throw new Error(formatDbError(fetchErr, "Could not leave event."));
+  if (!row) throw new Error("Event not found.");
+
+  const current = pickAttendees((row as { attendees?: unknown }).attendees) ?? [];
+  const next = current.filter((id) => id !== user.id);
+  if (next.length === current.length) return;
+
+  const { error } = await supabase
+    .from("community_events")
+    .update({ attendees: next })
+    .eq("id", eventId);
+
   if (error) throw new Error(formatDbError(error, "Could not leave event."));
 }
