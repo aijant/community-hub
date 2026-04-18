@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -157,6 +158,10 @@ export function ResidentProfiles() {
                 <DialogTitle className="text-left text-base font-semibold text-gray-900">
                   Add Your LinkedIn Profile
                 </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Paste your LinkedIn profile URL. We&apos;ll automatically pull your bio and profile
+                  information.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-1">
                 <div className="space-y-2">

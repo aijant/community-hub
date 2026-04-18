@@ -27,6 +27,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -418,6 +419,9 @@ export function MessageBoard() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit post</DialogTitle>
+            <DialogDescription className="sr-only">
+              Update the post text and category.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 pt-1">
             <Textarea

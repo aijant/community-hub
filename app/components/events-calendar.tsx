@@ -20,6 +20,7 @@ import { Textarea } from "./ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -329,6 +330,9 @@ export function EventsCalendar() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Event</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Enter the event details below.
+                </DialogDescription>
               </DialogHeader>
               {eventFormFields(newEvent, setNewEvent, "create")}
               <Button
@@ -554,6 +558,9 @@ export function EventsCalendar() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
+            <DialogDescription className="sr-only">
+              Enter the event details below.
+            </DialogDescription>
           </DialogHeader>
           {eventFormFields(editForm, setEditForm, "edit")}
           <DialogFooter className="gap-2 sm:gap-0">
