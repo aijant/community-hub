@@ -1,7 +1,6 @@
 -- Run in Supabase SQL Editor (Dashboard → SQL).
--- Adjust the column in USING(...) to match your table:
---   - Most common: user_id uuid references auth.users(id)
---   - Alternative: id uuid primary key references auth.users(id)
+-- This project: `user_roles.id` is the PK and matches auth.users(id).
+-- If you use a separate `user_id` column instead, change USING(...) accordingly.
 
 alter table public.user_roles enable row level security;
 
@@ -13,7 +12,7 @@ create policy "user_roles_select_own"
 on public.user_roles
 for select
 to authenticated
-using (auth.uid() = user_id);
+using (auth.uid() = id);
 
--- If your FK column is `id` instead of `user_id`, use:
--- using (auth.uid() = id);
+-- If you already created this policy with `user_id`, re-run the DROP + CREATE above
+-- in the SQL Editor so the policy matches your actual column names.

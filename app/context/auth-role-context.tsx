@@ -22,8 +22,8 @@ type AuthRoleContextValue = {
 
 const AuthRoleContext = createContext<AuthRoleContextValue | null>(null);
 
-/** Column on `user_roles` that stores `auth.users.id` (often `user_id`). */
-const USER_ROLES_AUTH_FK_COLUMN = "user_id" as const;
+/** Column on `user_roles` that matches `auth.users.id` (this schema uses `id` as PK/FK). */
+const USER_ROLES_AUTH_FK_COLUMN = "id" as const;
 
 function formatAuthOrQueryError(
   label: string,
