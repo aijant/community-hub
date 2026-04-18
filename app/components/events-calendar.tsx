@@ -61,7 +61,6 @@ type EventForm = {
   date: string;
   time: string;
   location: string;
-  maxAttendees: string;
 };
 
 const emptyForm = (): EventForm => ({
@@ -70,7 +69,6 @@ const emptyForm = (): EventForm => ({
   date: "",
   time: "",
   location: "",
-  maxAttendees: "",
 });
 
 function formFromEvent(ev: CommunityEventView): EventForm {
@@ -80,16 +78,7 @@ function formFromEvent(ev: CommunityEventView): EventForm {
     date: ev.date,
     time: ev.time,
     location: ev.location,
-    maxAttendees: ev.maxAttendees != null ? String(ev.maxAttendees) : "",
   };
-}
-
-function parseMaxAttendees(raw: string): number | null {
-  const t = raw.trim();
-  if (!t) return null;
-  const n = Number(t);
-  if (!Number.isFinite(n) || n < 1) return null;
-  return Math.floor(n);
 }
 
 export function EventsCalendar() {
@@ -168,7 +157,6 @@ export function EventsCalendar() {
         time: newEvent.time,
         location: newEvent.location,
         createdByUserId: user.id,
-        maxAttendees: parseMaxAttendees(newEvent.maxAttendees),
       });
       toast.success("Event created.");
       setNewEvent(emptyForm());
@@ -199,7 +187,6 @@ export function EventsCalendar() {
         date: editForm.date,
         time: editForm.time,
         location: editForm.location,
-        maxAttendees: parseMaxAttendees(editForm.maxAttendees),
       });
       toast.success("Event updated.");
       setEditOpen(false);
@@ -314,17 +301,6 @@ export function EventsCalendar() {
           placeholder="Common Area, Kitchen..."
           value={form.location}
           onChange={(e) => setForm({ ...form, location: e.target.value })}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-max`}>Max attendees (optional)</Label>
-        <Input
-          id={`${idPrefix}-max`}
-          type="number"
-          min={1}
-          placeholder="No limit"
-          value={form.maxAttendees}
-          onChange={(e) => setForm({ ...form, maxAttendees: e.target.value })}
         />
       </div>
     </div>

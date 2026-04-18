@@ -172,25 +172,14 @@ export async function updateCommunityEvent(input: {
   date: string;
   time: string;
   location: string;
-  maxAttendees?: number | null;
 }) {
-  const patch: {
-    title: string;
-    description: string | null;
-    date: string;
-    time: string;
-    location: string | null;
-    max_attendees?: number | null;
-  } = {
+  const patch = {
     title: input.title.trim(),
     description: input.description.trim() || null,
     date: input.date,
     time: input.time,
     location: input.location.trim() || null,
   };
-  if (input.maxAttendees !== undefined) {
-    patch.max_attendees = input.maxAttendees;
-  }
 
   const { error } = await supabase.from("community_events").update(patch).eq("id", input.eventId);
   if (error) throw new Error(formatDbError(error, "Could not update event."));
