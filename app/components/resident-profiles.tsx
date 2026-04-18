@@ -94,11 +94,10 @@ export function ResidentProfiles() {
       }
 
       toast.success(toastMessageFromPayload(data), {
-        description: "Updating the resident list…",
+        description: "Use Refresh when you want to reload the list.",
       });
       setAddOpen(false);
       setLinkedinUrlInput("");
-      void loadProfiles({ silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not add profile.");
     } finally {
@@ -247,7 +246,7 @@ export function ResidentProfiles() {
                   key={profile.id}
                   className="pl-3 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4"
                 >
-                  <Card className="p-4 hover:shadow-md transition-shadow bg-white border border-gray-200 h-full">
+                  <Card className="p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200 h-full">
                     <div className="flex flex-col items-center text-center space-y-3">
                       <div className="relative shrink-0">
                         <Avatar className="w-16 h-16">

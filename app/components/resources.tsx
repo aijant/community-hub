@@ -14,6 +14,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { downloadCommunityDocument } from "../lib/download-community-document";
 import { supabaseConfigured } from "../lib/supabase-client";
+import { QuickAccess } from "./quick-access";
 
 const COMMUNITY_DOCUMENTS_URL =
   "https://ksxqwsihrizusoxorrcn.supabase.co/functions/v1/get_community_documents";
@@ -25,7 +26,7 @@ interface ApiDocumentType {
   value: ResourceKind;
 }
 
-interface ApiDocument {
+export interface ApiDocument {
   id: string;
   title: string;
   description: string | null;
@@ -57,7 +58,7 @@ const typeConfig: Record<
   { icon: typeof FileText; color: string; label: string }
 > = {
   document: { icon: FileText, color: "bg-blue-100 text-blue-700", label: "Document" },
-  link: { icon: Link2, color: "bg-purple-100 text-purple-700", label: "Link" },
+  link: { icon: Link2, color: "bg-fuchsia-100 text-fuchsia-800", label: "Link" },
   guide: { icon: BookOpen, color: "bg-green-100 text-green-700", label: "Guide" },
   video: { icon: Film, color: "bg-rose-100 text-rose-700", label: "Video" },
 };
@@ -234,7 +235,8 @@ export function Resources() {
             return (
               <Card
                 key={doc.id}
-                className={`p-4 hover:shadow-md transition-shadow bg-white border border-gray-200 group ${
+                id={`resource-${doc.id}`}
+                className={`scroll-mt-24 p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200 group ${
                   canOpen && !isBusy ? "cursor-pointer" : ""
                 } ${isBusy ? "opacity-80 pointer-events-none" : ""}`}
                 onClick={() => {
@@ -293,6 +295,8 @@ export function Resources() {
           })}
         </div>
       )}
+
+      {!loading ? <QuickAccess documents={documents} /> : null}
     </div>
   );
 }

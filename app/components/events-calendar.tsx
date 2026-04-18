@@ -192,7 +192,7 @@ export function EventsCalendar() {
 
       {/* Highlighted Next Event */}
       {upcomingEvent && (
-        <Card className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200">
+        <Card className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200 shadow-sm">
           <div className="space-y-3">
             <Badge className="bg-blue-600 text-white">Next Event</Badge>
             <div>
@@ -241,7 +241,7 @@ export function EventsCalendar() {
       )}
 
       {/* All Events List */}
-      <Card className="bg-white border border-gray-200">
+      <Card className="bg-white border border-gray-200 shadow-sm">
         <div className="p-3 border-b border-gray-200">
           <h3 className="font-semibold text-gray-900 text-sm">All Events</h3>
         </div>

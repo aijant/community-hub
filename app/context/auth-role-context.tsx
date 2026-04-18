@@ -22,6 +22,18 @@ type AuthRoleContextValue = {
 
 const AuthRoleContext = createContext<AuthRoleContextValue | null>(null);
 
+/** Column on `user_roles` that stores `auth.users.id` (often `user_id`). */
+const USER_ROLES_AUTH_FK_COLUMN = "user_id" as const;
+
+function formatAuthOrQueryError(
+  label: string,
+  err: { message: string; code?: string } | null,
+): string {
+  if (!err?.message) return `${label}: unknown error`;
+  const code = err.code ? ` [${err.code}]` : "";
+  return `${label}: ${err.message}${code}`;
+}
+
 export function AuthRoleProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
@@ -32,10 +44,14 @@ export function AuthRoleProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const {
-        data: { user: u },
-      } = await supabase.auth.getUser();
-      setUser(u ?? null);
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      const u = authData?.user ?? null;
+      setUser(u);
+      if (authErr) {
+        setError(formatAuthOrQueryError("getUser", authErr));
+        setRole(null);
+        return;
+      }
       if (!u) {
         setRole(null);
         return;
@@ -43,10 +59,10 @@ export function AuthRoleProvider({ children }: { children: ReactNode }) {
       const { data, error: qErr } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("id", u.id)
-        .single();
+        .eq(USER_ROLES_AUTH_FK_COLUMN, u.id)
+        .maybeSingle();
       if (qErr) {
-        setError(qErr.message);
+        setError(formatAuthOrQueryError("user_roles", qErr));
         setRole(null);
         return;
       }
@@ -63,12 +79,11 @@ export function AuthRoleProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void load();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
+    const { data: listenerData } = supabase.auth.onAuthStateChange(() => {
       void load();
     });
-    return () => subscription.unsubscribe();
+    const subscription = listenerData?.subscription;
+    return () => subscription?.unsubscribe();
   }, [load]);
 
   const normalized = useMemo(() => role?.trim().toLowerCase() ?? "", [role]);

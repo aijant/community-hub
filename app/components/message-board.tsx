@@ -318,7 +318,7 @@ export function MessageBoard() {
       ) : null}
 
       {/* Create Post */}
-      <Card className="p-4 bg-white border border-gray-200">
+      <Card className="p-4 bg-white border border-gray-200 shadow-sm">
         <div className="space-y-3">
           <Textarea
             placeholder="Share something with your housemates..."
@@ -380,21 +380,21 @@ export function MessageBoard() {
 
       {/* Pinned Posts */}
       {pinnedPosts.length > 0 && (
-        <Card className="bg-blue-50 border border-blue-200">
-          <div className="p-3 border-b border-blue-200 bg-blue-100">
+        <Card className="bg-sky-50 border border-sky-100 shadow-sm">
+          <div className="p-3 border-b border-sky-100 bg-sky-100/80">
             <div className="flex items-center gap-2">
-              <Pin className="w-4 h-4 text-blue-700" />
-              <h3 className="font-semibold text-blue-900 text-sm">Pinned</h3>
+              <Pin className="w-4 h-4 text-sky-800" />
+              <h3 className="font-semibold text-sky-950 text-sm">Pinned</h3>
             </div>
           </div>
-          <div className="divide-y divide-blue-100">
+          <div className="divide-y divide-sky-100">
             {pinnedPosts.map((post) => renderPost(post, true))}
           </div>
         </Card>
       )}
 
       {/* Recent Posts */}
-      <Card className="bg-white border border-gray-200">
+      <Card className="bg-white border border-gray-200 shadow-sm">
         <div className="p-3 border-b border-gray-200 flex items-center justify-between gap-2">
           <h3 className="font-semibold text-gray-900 text-sm">Recent</h3>
           {supabaseConfigured && !postsLoading ? (
