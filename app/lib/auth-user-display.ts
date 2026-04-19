@@ -51,41 +51,42 @@ function displayFromUserMetadata(user: User): AuthUserDisplayParts {
   return { firstName, lastName, avatarUrl };
 }
 
-function mergeCommunityProfile(
-  base: AuthUserDisplayParts,
-  profile: { name: string; avatar: string } | null | undefined,
-): AuthUserDisplayParts {
-  if (!profile) return base;
-  let { firstName, lastName, avatarUrl } = base;
+/** Subset of community profile used for header display (from `get_community_profiles`). */
+export type CommunityProfileDisplayInput = {
+  name: string;
+  avatar: string;
+  firstName?: string;
+  lastName?: string;
+};
 
-  if (!avatarUrl && profile.avatar.trim()) {
-    avatarUrl = profile.avatar.trim();
-  }
-
-  if ((!firstName || !lastName) && profile.name.trim()) {
+function partsFromCommunityProfile(profile: CommunityProfileDisplayInput): AuthUserDisplayParts {
+  let firstName = profile.firstName?.trim() ?? "";
+  let lastName = profile.lastName?.trim() ?? "";
+  if (!firstName && !lastName && profile.name.trim()) {
     const { first, rest } = splitFirstAndRest(profile.name);
-    if (!firstName) firstName = first;
-    if (!lastName) lastName = rest;
+    firstName = first;
+    lastName = rest;
   }
-
-  if (!lastName && profile.name.trim()) {
-    const { first, rest } = splitFirstAndRest(profile.name);
-    if (rest && (!firstName || first.toLowerCase() === firstName.toLowerCase())) {
-      lastName = rest;
-      if (!firstName) firstName = first;
-    }
-  }
-
-  return { firstName, lastName, avatarUrl };
+  return { firstName, lastName, avatarUrl: profile.avatar.trim() };
 }
 
-/** Display name + avatar from Supabase auth user, optionally enriched from a community profile row. */
+/**
+ * Name + avatar for the signed-in user. When a matching community profile exists, its
+ * `first_name` / `last_name` / `name` / `avatar_url` take priority; auth metadata fills gaps.
+ */
 export function resolveAuthUserDisplay(
   user: User | null,
-  communityProfile: { name: string; avatar: string } | null | undefined,
+  communityProfile: CommunityProfileDisplayInput | null | undefined,
 ): AuthUserDisplayParts {
   if (!user) {
     return { firstName: "", lastName: "", avatarUrl: "" };
   }
-  return mergeCommunityProfile(displayFromUserMetadata(user), communityProfile ?? null);
+  const meta = displayFromUserMetadata(user);
+  if (!communityProfile) return meta;
+  const fromProfile = partsFromCommunityProfile(communityProfile);
+  return {
+    firstName: fromProfile.firstName || meta.firstName,
+    lastName: fromProfile.lastName || meta.lastName,
+    avatarUrl: fromProfile.avatarUrl || meta.avatarUrl,
+  };
 }

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useAuthRole } from "../hooks/use-auth-role";
 import { useCommunityProfiles } from "../context/community-profiles-context";
-import { getCommunityProfileId } from "../lib/supabase-user-metadata";
+import { findCommunityProfileForAuthUser } from "../lib/community-profiles";
 import { resolveAuthUserDisplay } from "../lib/auth-user-display";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Badge } from "./ui/badge";
@@ -26,14 +26,24 @@ export function DashboardUserStrip() {
   const { user, role, loading, error } = useAuthRole();
   const { rows: profileRows } = useCommunityProfiles();
 
-  const matchedProfile = useMemo(() => {
-    const id = getCommunityProfileId(user);
-    if (!id) return null;
-    return profileRows.find((r) => r.id === id) ?? null;
-  }, [user, profileRows]);
+  const matchedProfile = useMemo(
+    () => findCommunityProfileForAuthUser(user, profileRows),
+    [user, profileRows],
+  );
 
   const display = useMemo(
-    () => resolveAuthUserDisplay(user, matchedProfile),
+    () =>
+      resolveAuthUserDisplay(
+        user,
+        matchedProfile
+          ? {
+              name: matchedProfile.name,
+              avatar: matchedProfile.avatar,
+              firstName: matchedProfile.firstName,
+              lastName: matchedProfile.lastName,
+            }
+          : null,
+      ),
     [user, matchedProfile],
   );
 

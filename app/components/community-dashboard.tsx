@@ -32,8 +32,12 @@ export function CommunityDashboard() {
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 shrink-0 sm:flex-1 sm:min-w-0">
-              <DashboardUserStrip />
-              <CommunityChatLinkButtons />
+              <div className="order-2 min-w-0">
+                <DashboardUserStrip />
+              </div>
+              <div className="order-1 flex flex-wrap gap-2 justify-end">
+                <CommunityChatLinkButtons />
+              </div>
             </div>
           </div>
         </div>
