@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Link2,
   Loader2,
+  MessageSquare,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -15,6 +16,7 @@ import { Button } from "./ui/button";
 import { downloadCommunityDocument } from "../lib/download-community-document";
 import { supabaseConfigured } from "../lib/supabase-client";
 import { QuickAccess } from "./quick-access";
+import { CommunityChatLinkButtons } from "./community-chat-link-buttons";
 
 const COMMUNITY_DOCUMENTS_URL =
   "https://ksxqwsihrizusoxorrcn.supabase.co/functions/v1/get_community_documents";
@@ -180,6 +182,20 @@ export function Resources() {
               {label}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+        <div className="flex items-center gap-2 text-sm text-gray-800">
+          <MessageSquare className="w-4 h-4 shrink-0 text-gray-600" aria-hidden />
+          <span className="font-medium">Community chats</span>
+          <span className="text-xs text-gray-500 hidden sm:inline">
+            Same links as the header; set URLs in{" "}
+            <code className="rounded bg-gray-200/80 px-1 py-0.5 text-[10px]">.env.local</code>.
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2 justify-end">
+          <CommunityChatLinkButtons />
         </div>
       </div>
 
