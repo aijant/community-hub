@@ -21,6 +21,7 @@ import {
   CarouselItem,
 } from "./ui/carousel";
 import { supabase, supabaseConfigured } from "../lib/supabase-client";
+import { getCommunityProfileId } from "../lib/supabase-user-metadata";
 import { useCommunityProfiles } from "../context/community-profiles-context";
 import { useAuthRole } from "../hooks/use-auth-role";
 
@@ -94,6 +95,14 @@ export function ResidentProfiles() {
         return;
       }
 
+      const { error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) {
+        toast.error(refreshErr.message || "Session could not refresh; try signing out and back in.");
+        return;
+      }
+
+      void loadProfiles({ silent: true });
+
       toast.success(toastMessageFromPayload(data), {
         description: "Use Refresh when you want to reload the list.",
       });
@@ -150,13 +159,13 @@ export function ResidentProfiles() {
                 }
               >
                 <Plus className="w-4 h-4" />
-                Add Profile
+                Add my profile
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle className="text-left text-base font-semibold text-gray-900">
-                  Add Your LinkedIn Profile
+                  Add my LinkedIn profile
                 </DialogTitle>
                 <DialogDescription className="sr-only">
                   Paste your LinkedIn profile URL. We&apos;ll automatically pull your bio and profile
@@ -196,7 +205,7 @@ export function ResidentProfiles() {
                   ) : (
                     <>
                       <Linkedin className="w-4 h-4 text-white" />
-                      Add Profile
+                      Add my profile
                     </>
                   )}
                 </Button>
@@ -243,8 +252,9 @@ export function ResidentProfiles() {
           >
             <CarouselContent className="-ml-3">
               {profiles.map((profile) => {
+                const myProfileId = getCommunityProfileId(user);
                 const showClientBadge = Boolean(
-                  isClient && user && profile.id === user.id,
+                  isClient && user && myProfileId && profile.id === myProfileId,
                 );
                 return (
                 <CarouselItem

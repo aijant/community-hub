@@ -34,6 +34,7 @@ import {
 } from "./ui/dialog";
 import { cn } from "./ui/utils";
 import { supabaseConfigured } from "../lib/supabase-client";
+import { getCommunityProfileId } from "../lib/supabase-user-metadata";
 import type { PostCategory } from "../lib/community-post-types";
 import { DEFAULT_POST_CHANNEL } from "../lib/community-post-types";
 import type { BoardPostView } from "../lib/community-posts";
@@ -65,7 +66,7 @@ export function MessageBoard() {
     [rows],
   );
 
-  const selectedAuthorId = useMemo(() => rows[0]?.id ?? "", [rows]);
+  const myCommunityProfileId = useMemo(() => getCommunityProfileId(user), [user]);
 
   const [posts, setPosts] = useState<BoardPostView[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -113,13 +114,13 @@ export function MessageBoard() {
   };
 
   const handleAddPost = async () => {
-    if (!newPost.trim() || !selectedAuthorId || !supabaseConfigured || !user) return;
+    if (!newPost.trim() || !myCommunityProfileId || !supabaseConfigured || !user) return;
     setSubmitting(true);
     try {
       await createCommunityPost({
         content: newPost.trim(),
         category: selectedCategory,
-        authorId: selectedAuthorId,
+        authorId: myCommunityProfileId,
         channel: DEFAULT_POST_CHANNEL,
         isPinned: false,
       });
@@ -282,12 +283,7 @@ export function MessageBoard() {
   };
 
   const composerDisabled =
-    !supabaseConfigured ||
-    profilesLoading ||
-    authLoading ||
-    rows.length === 0 ||
-    !selectedAuthorId ||
-    !user;
+    !supabaseConfigured || authLoading || !user || !myCommunityProfileId;
 
   return (
     <div className="space-y-4">
@@ -315,7 +311,17 @@ export function MessageBoard() {
       ) : null}
 
       {profilesError ? (
-        <p className="text-sm text-red-700">Profiles could not load; add residents to post as an author.</p>
+        <p className="text-sm text-red-700">
+          Profiles could not load. You can still post if you have added your profile via{" "}
+          <span className="font-medium">Add my profile</span> (LinkedIn).
+        </p>
+      ) : null}
+
+      {supabaseConfigured && user && !authLoading && !myCommunityProfileId ? (
+        <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+          Add your community profile with <span className="font-medium">Add my profile</span> to post on
+          the board.
+        </p>
       ) : null}
 
       {/* Create Post */}
