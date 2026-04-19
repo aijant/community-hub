@@ -50,11 +50,11 @@ export function DashboardUserStrip() {
   if (loading) {
     return (
       <div
-        className="flex items-center gap-3 min-w-[10rem] rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2"
+        className="flex w-full max-w-none items-center gap-3 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-2 sm:max-w-[min(100%,20rem)]"
         aria-busy="true"
         aria-label="Loading account"
       >
-        <div className="h-9 w-9 shrink-0 rounded-full bg-gray-200 animate-pulse" />
+        <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200 animate-pulse sm:h-9 sm:w-9" />
         <div className="space-y-1.5 min-w-0 flex-1">
           <div className="h-3.5 w-24 max-w-full rounded bg-gray-200 animate-pulse" />
           <div className="h-3 w-16 rounded bg-gray-200 animate-pulse" />
@@ -65,7 +65,7 @@ export function DashboardUserStrip() {
 
   if (!user) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2 text-xs text-gray-500">
+      <div className="w-full max-w-none rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2 text-xs text-gray-500 sm:max-w-[min(100%,20rem)]">
         Not signed in
       </div>
     );
@@ -75,8 +75,8 @@ export function DashboardUserStrip() {
   const showTwoLines = Boolean(display.firstName && display.lastName);
 
   return (
-    <div className="flex items-center gap-3 min-w-0 max-w-[min(100%,20rem)] rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
-      <Avatar className="h-9 w-9 shrink-0">
+    <div className="flex w-full max-w-none min-w-0 items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm sm:max-w-[min(100%,20rem)]">
+      <Avatar className="h-8 w-8 shrink-0 sm:h-9 sm:w-9">
         <AvatarImage
           src={display.avatarUrl || undefined}
           alt={line1 || "Signed-in user"}

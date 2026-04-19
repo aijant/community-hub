@@ -226,10 +226,10 @@ export function EventsCalendar() {
     setRsvpBusyId(eventId);
     try {
       if (attending) {
-        await leaveCommunityEvent(eventId);
+        await leaveCommunityEvent(eventId, user.id);
         toast.success("You left this event.");
       } else {
-        await joinCommunityEvent(eventId);
+        await joinCommunityEvent(eventId, user.id);
         toast.success("You’re attending.");
       }
       await loadEvents();

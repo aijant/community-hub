@@ -1,9 +1,9 @@
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -34,57 +34,92 @@ function formatAuthOrQueryError(
   return `${label}: ${err.message}${code}`;
 }
 
+function roleFromUserRolesRow(data: unknown): string | null {
+  const r =
+    data && typeof data === "object" && "role" in data ? (data as { role: unknown }).role : null;
+  return typeof r === "string" && r.trim() ? r.trim() : null;
+}
+
 export function AuthRoleProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser();
-      const u = authData?.user ?? null;
-      setUser(u);
-      if (authErr) {
-        setError(formatAuthOrQueryError("getUser", authErr));
-        setRole(null);
-        return;
-      }
-      if (!u) {
-        setRole(null);
-        return;
-      }
-      const { data, error: qErr } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq(USER_ROLES_AUTH_FK_COLUMN, u.id)
-        .maybeSingle();
-      if (qErr) {
-        setError(formatAuthOrQueryError("user_roles", qErr));
-        setRole(null);
-        return;
-      }
-      const r =
-        data && typeof data === "object" && "role" in data ? (data as { role: unknown }).role : null;
-      setRole(typeof r === "string" && r.trim() ? r.trim() : null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load role.");
-      setRole(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  /** Last user id we successfully loaded `role` for (avoids re-query on TOKEN_REFRESHED / tab focus). */
+  const roleLoadedForUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    void load();
-    const { data: listenerData } = supabase.auth.onAuthStateChange(() => {
-      void load();
+    const applySignedOut = () => {
+      roleLoadedForUserIdRef.current = null;
+      setUser(null);
+      setRole(null);
+      setError(null);
+      setLoading(false);
+    };
+
+    const fetchRoleForUser = async (u: User) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: qErr } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq(USER_ROLES_AUTH_FK_COLUMN, u.id)
+          .maybeSingle();
+        if (qErr) {
+          setError(formatAuthOrQueryError("user_roles", qErr));
+          setRole(null);
+          roleLoadedForUserIdRef.current = null;
+          return;
+        }
+        setRole(roleFromUserRolesRow(data));
+        roleLoadedForUserIdRef.current = u.id;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load role.");
+        setRole(null);
+        roleLoadedForUserIdRef.current = null;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const { data: listenerData } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        applySignedOut();
+        return;
+      }
+
+      const u = session?.user ?? null;
+      if (!u) {
+        applySignedOut();
+        return;
+      }
+
+      if (event === "TOKEN_REFRESHED") {
+        setUser(u);
+        setLoading(false);
+        return;
+      }
+
+      if (event === "USER_UPDATED") {
+        setUser(u);
+        setLoading(false);
+        return;
+      }
+
+      setUser(u);
+
+      if (roleLoadedForUserIdRef.current === u.id) {
+        setLoading(false);
+        return;
+      }
+
+      void fetchRoleForUser(u);
     });
+
     const subscription = listenerData?.subscription;
     return () => subscription?.unsubscribe();
-  }, [load]);
+  }, []);
 
   const normalized = useMemo(() => role?.trim().toLowerCase() ?? "", [role]);
 

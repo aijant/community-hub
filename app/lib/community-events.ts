@@ -190,11 +190,9 @@ export async function deleteCommunityEvent(eventId: string) {
   if (error) throw new Error(formatDbError(error, "Could not delete event."));
 }
 
-export async function joinCommunityEvent(eventId: string) {
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(formatDbError(authErr, "Could not join event."));
-  const user = authData?.user;
-  if (!user) throw new Error("Sign in to join an event.");
+export async function joinCommunityEvent(eventId: string, userId: string) {
+  const uid = userId.trim();
+  if (!uid) throw new Error("Sign in to join an event.");
 
   const { data: row, error: fetchErr } = await supabase
     .from("community_events")
@@ -206,21 +204,19 @@ export async function joinCommunityEvent(eventId: string) {
   if (!row) throw new Error("Event not found.");
 
   const current = pickAttendees((row as { attendees?: unknown }).attendees) ?? [];
-  if (current.includes(user.id)) return;
+  if (current.includes(uid)) return;
 
   const { error } = await supabase
     .from("community_events")
-    .update({ attendees: [...current, user.id] })
+    .update({ attendees: [...current, uid] })
     .eq("id", eventId);
 
   if (error) throw new Error(formatDbError(error, "Could not join event."));
 }
 
-export async function leaveCommunityEvent(eventId: string) {
-  const { data: authData, error: authErr } = await supabase.auth.getUser();
-  if (authErr) throw new Error(formatDbError(authErr, "Could not leave event."));
-  const user = authData?.user;
-  if (!user) throw new Error("Sign in to leave an event.");
+export async function leaveCommunityEvent(eventId: string, userId: string) {
+  const uid = userId.trim();
+  if (!uid) throw new Error("Sign in to leave an event.");
 
   const { data: row, error: fetchErr } = await supabase
     .from("community_events")
@@ -232,7 +228,7 @@ export async function leaveCommunityEvent(eventId: string) {
   if (!row) throw new Error("Event not found.");
 
   const current = pickAttendees((row as { attendees?: unknown }).attendees) ?? [];
-  const next = current.filter((id) => id !== user.id);
+  const next = current.filter((id) => id !== uid);
   if (next.length === current.length) return;
 
   const { error } = await supabase

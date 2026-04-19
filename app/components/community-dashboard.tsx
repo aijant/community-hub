@@ -16,7 +16,7 @@ export function CommunityDashboard() {
     <div className="min-h-screen bg-[#f8f9fa]">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-12 py-3.5 sm:py-4">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-12 py-3.5 sm:py-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 shrink-0 bg-gradient-to-br from-purple-600 to-blue-500 rounded-lg flex items-center justify-center shadow-sm">
@@ -31,11 +31,11 @@ export function CommunityDashboard() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 shrink-0 sm:flex-1 sm:min-w-0">
-              <div className="order-2 min-w-0">
+            <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-1 sm:min-w-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+              <div className="min-w-0 w-full sm:order-2 sm:w-auto">
                 <DashboardUserStrip />
               </div>
-              <div className="order-1 flex flex-wrap gap-2 justify-end">
+              <div className="min-w-0 w-full sm:order-1 sm:w-auto">
                 <CommunityChatLinkButtons />
               </div>
             </div>
@@ -44,7 +44,7 @@ export function CommunityDashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-12 py-8">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-10 lg:px-12 py-8">
         <div className="space-y-8">
           {/* Message Board + Events */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
