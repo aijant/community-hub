@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Linkedin, Loader2, Plus, RefreshCw, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -48,6 +48,8 @@ export function ResidentProfiles() {
     useCommunityProfiles();
   const { user, isClient } = useAuthRole();
 
+  const hasCommunityProfile = useMemo(() => Boolean(getCommunityProfileId(user)), [user]);
+
   const [addOpen, setAddOpen] = useState(false);
   const [linkedinUrlInput, setLinkedinUrlInput] = useState("");
   const [addSubmitting, setAddSubmitting] = useState(false);
@@ -67,6 +69,10 @@ export function ResidentProfiles() {
     const id = window.setInterval(tick, CAROUSEL_AUTOPLAY_MS);
     return () => window.clearInterval(id);
   }, [carouselApi, profiles.length]);
+
+  useEffect(() => {
+    if (hasCommunityProfile) setAddOpen(false);
+  }, [hasCommunityProfile]);
 
   const handleRefreshProfiles = () => {
     setRefreshing(true);
@@ -144,74 +150,65 @@ export function ResidentProfiles() {
               <RefreshCw className="w-4 h-4" />
             )}
           </Button>
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="gap-2"
-                disabled={!supabaseConfigured}
-                title={
-                  !supabaseConfigured
-                    ? "Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local"
-                    : undefined
-                }
-              >
-                <Plus className="w-4 h-4" />
-                Add my profile
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle className="text-left text-base font-semibold text-gray-900">
-                  Add my LinkedIn profile
-                </DialogTitle>
-                <DialogDescription className="sr-only">
-                  Paste your LinkedIn profile URL. We&apos;ll automatically pull your bio and profile
-                  information.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 pt-1">
-                <div className="space-y-2">
-                  <Label htmlFor="linkedin-url" className="text-sm font-medium text-gray-900">
-                    LinkedIn Profile URL
-                  </Label>
-                  <Input
-                    id="linkedin-url"
-                    type="text"
-                    inputMode="url"
-                    autoComplete="url"
-                    placeholder="linkedin.com/in/yourprofile"
-                    value={linkedinUrlInput}
-                    onChange={(e) => setLinkedinUrlInput(e.target.value)}
-                    className="border-gray-300"
-                  />
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    We&apos;ll automatically pull your bio and profile information
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  className="w-full h-11 rounded-lg bg-gray-800 text-white hover:bg-gray-900 shadow-sm"
-                  onClick={() => void handleAddProfile()}
-                  disabled={addSubmitting}
-                >
-                  {addSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      Adding…
-                    </>
-                  ) : (
-                    <>
-                      <Linkedin className="w-4 h-4 text-white" />
-                      Add my profile
-                    </>
-                  )}
+          {supabaseConfigured && !hasCommunityProfile ? (
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" size="sm" variant="outline" className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add my profile
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-left text-base font-semibold text-gray-900">
+                    Add my LinkedIn profile
+                  </DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Paste your LinkedIn profile URL. We&apos;ll automatically pull your bio and profile
+                    information.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin-url" className="text-sm font-medium text-gray-900">
+                      LinkedIn Profile URL
+                    </Label>
+                    <Input
+                      id="linkedin-url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
+                      placeholder="linkedin.com/in/yourprofile"
+                      value={linkedinUrlInput}
+                      onChange={(e) => setLinkedinUrlInput(e.target.value)}
+                      className="border-gray-300"
+                    />
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      We&apos;ll automatically pull your bio and profile information
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="w-full h-11 rounded-lg bg-gray-800 text-white hover:bg-gray-900 shadow-sm"
+                    onClick={() => void handleAddProfile()}
+                    disabled={addSubmitting}
+                  >
+                    {addSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        Adding…
+                      </>
+                    ) : (
+                      <>
+                        <Linkedin className="w-4 h-4 text-white" />
+                        Add my profile
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          ) : null}
         </div>
       </div>
 
