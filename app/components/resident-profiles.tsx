@@ -21,7 +21,7 @@ import {
   CarouselItem,
 } from "./ui/carousel";
 import { supabase, supabaseConfigured } from "../lib/supabase-client";
-import { getCommunityProfileId } from "../lib/supabase-user-metadata";
+import { getCommunityProfileIdForUser } from "../lib/community-profiles";
 import { useCommunityProfiles } from "../context/community-profiles-context";
 import { useAuthRole } from "../hooks/use-auth-role";
 
@@ -48,7 +48,11 @@ export function ResidentProfiles() {
     useCommunityProfiles();
   const { user, isClient } = useAuthRole();
 
-  const hasCommunityProfile = useMemo(() => Boolean(getCommunityProfileId(user)), [user]);
+  const myCommunityProfileId = useMemo(
+    () => getCommunityProfileIdForUser(user, profiles),
+    [user, profiles],
+  );
+  const hasCommunityProfile = Boolean(myCommunityProfileId);
 
   const [addOpen, setAddOpen] = useState(false);
   const [linkedinUrlInput, setLinkedinUrlInput] = useState("");
@@ -249,9 +253,8 @@ export function ResidentProfiles() {
           >
             <CarouselContent className="-ml-3">
               {profiles.map((profile) => {
-                const myProfileId = getCommunityProfileId(user);
                 const showClientBadge = Boolean(
-                  isClient && user && myProfileId && profile.id === myProfileId,
+                  isClient && user && myCommunityProfileId && profile.id === myCommunityProfileId,
                 );
                 return (
                 <CarouselItem

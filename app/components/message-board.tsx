@@ -34,7 +34,7 @@ import {
 } from "./ui/dialog";
 import { cn } from "./ui/utils";
 import { supabaseConfigured } from "../lib/supabase-client";
-import { getCommunityProfileId } from "../lib/supabase-user-metadata";
+import { getCommunityProfileIdForUser } from "../lib/community-profiles";
 import type { PostCategory } from "../lib/community-post-types";
 import { DEFAULT_POST_CHANNEL } from "../lib/community-post-types";
 import type { BoardPostView } from "../lib/community-posts";
@@ -60,7 +60,7 @@ export function MessageBoard() {
   const { rows, loading: profilesLoading, error: profilesError, reload: reloadProfiles } =
     useCommunityProfiles();
 
-  const { user, loading: authLoading, error: roleError, canPin, canModerate } = useAuthRole();
+  const { user, loading: authLoading, error: roleError, canPin, canModerate, isClient } = useAuthRole();
 
   const profileLookup = useMemo(
     () => rows.map((r) => ({ id: r.id, name: r.name, avatar: r.avatar })),
@@ -77,7 +77,10 @@ export function MessageBoard() {
     [rows],
   );
 
-  const myCommunityProfileId = useMemo(() => getCommunityProfileId(user), [user]);
+  const myCommunityProfileId = useMemo(
+    () => getCommunityProfileIdForUser(user, rows),
+    [user, rows],
+  );
 
   const [posts, setPosts] = useState<BoardPostView[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -212,8 +215,13 @@ export function MessageBoard() {
     const isOwnerByAuth = Boolean(
       user?.id && post.createdByUserId && post.createdByUserId === user.id,
     );
+    const isOwnerByClientProfile = Boolean(
+      isClient &&
+        myCommunityProfileId &&
+        post.authorId === myCommunityProfileId,
+    );
     const showPin = canPin;
-    const showEditDelete = canModerate || isOwnerByAuth;
+    const showEditDelete = canModerate || isOwnerByAuth || isOwnerByClientProfile;
     const showMenu = showPin || showEditDelete;
 
     const whatsappIntegration = post.channel.trim().toLowerCase() === "whatsapp";

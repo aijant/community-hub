@@ -116,6 +116,31 @@ export function findCommunityProfileForAuthUser(
   return null;
 }
 
+/** Synthetic id from `mapApiProfileToCommunityRow` when API omits `id`. */
+function isPlaceholderCommunityProfileId(id: string): boolean {
+  return /^profile-\d+$/.test(id.trim());
+}
+
+/**
+ * Community profile UUID for posting / UI: prefers row match (metadata, user id, email),
+ * then JWT `user_metadata.community_profile` when rows are not yet loaded.
+ * Omits placeholder ids when the API returned no real `id`.
+ */
+export function getCommunityProfileIdForUser(
+  user: User | null,
+  rows: CommunityProfileRow[],
+): string | null {
+  const matched = findCommunityProfileForAuthUser(user, rows);
+  if (matched && !isPlaceholderCommunityProfileId(matched.id)) {
+    return matched.id;
+  }
+  const meta = getCommunityProfileId(user);
+  if (meta && !isPlaceholderCommunityProfileId(meta)) {
+    return meta;
+  }
+  return null;
+}
+
 const PIN_ROLES = new Set(["admin", "manager"]);
 
 /** Case-insensitive: only admin and manager may pin/unpin. */
