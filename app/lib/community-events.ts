@@ -113,9 +113,7 @@ export function mapEventRowsToViews(
   return rows.map((r) => mapEventRowToView(r, lookup));
 }
 
-export async function fetchCommunityEvents(
-  profileRows: { id: string; name: string }[],
-): Promise<CommunityEventView[]> {
+export async function fetchCommunityEventRows(): Promise<CommunityEventRow[]> {
   const { data, error } = await supabase
     .from("community_events")
     .select("*")
@@ -127,6 +125,13 @@ export async function fetchCommunityEvents(
     const row = parseEventRow(raw);
     if (row) rows.push(row);
   }
+  return rows;
+}
+
+export async function fetchCommunityEvents(
+  profileRows: { id: string; name: string }[],
+): Promise<CommunityEventView[]> {
+  const rows = await fetchCommunityEventRows();
   return mapEventRowsToViews(rows, profileRows);
 }
 

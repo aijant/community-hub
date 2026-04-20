@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pin,
   MessageSquare,
@@ -42,7 +42,8 @@ import {
   createCommunityPost,
   deleteCommunityPost,
   editCommunityPost,
-  fetchCommunityPosts,
+  fetchCommunityPostsRaw,
+  mapPostsResponse,
 } from "../lib/community-posts";
 import { useCommunityProfiles } from "../context/community-profiles-context";
 import { useAuthRole } from "../hooks/use-auth-role";
@@ -63,6 +64,16 @@ export function MessageBoard() {
 
   const profileLookup = useMemo(
     () => rows.map((r) => ({ id: r.id, name: r.name, avatar: r.avatar })),
+    [rows],
+  );
+
+  const profileLookupRef = useRef(profileLookup);
+  profileLookupRef.current = profileLookup;
+
+  const postsPayloadRef = useRef<unknown>(null);
+
+  const profileEnrichmentKey = useMemo(
+    () => rows.map((r) => `${r.id}\t${r.name}\t${r.avatar}`).join("\n"),
     [rows],
   );
 
@@ -87,21 +98,30 @@ export function MessageBoard() {
     setPostsLoading(true);
     setPostsError(null);
     try {
-      const list = await fetchCommunityPosts(profileLookup);
-      setPosts(list);
+      const data = await fetchCommunityPostsRaw();
+      postsPayloadRef.current = data;
+      setPosts(mapPostsResponse(data, profileLookupRef.current));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not load posts.";
       setPostsError(msg);
+      postsPayloadRef.current = null;
       setPosts([]);
     } finally {
       setPostsLoading(false);
     }
-  }, [profileLookup]);
+  }, [supabaseConfigured]);
 
   useEffect(() => {
     if (!supabaseConfigured || profilesLoading) return;
     void loadPosts();
-  }, [loadPosts, profilesLoading]);
+  }, [loadPosts, profilesLoading, supabaseConfigured]);
+
+  useEffect(() => {
+    if (profilesLoading) return;
+    const raw = postsPayloadRef.current;
+    if (raw == null) return;
+    setPosts(mapPostsResponse(raw, profileLookupRef.current));
+  }, [profileEnrichmentKey, profilesLoading]);
 
   const pinnedPosts = posts.filter((post) => post.isPinned);
   const regularPosts = posts.filter((post) => !post.isPinned);

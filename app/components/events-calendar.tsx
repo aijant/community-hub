@@ -45,12 +45,14 @@ import { Badge } from "./ui/badge";
 import { cn } from "./ui/utils";
 import { supabaseConfigured } from "../lib/supabase-client";
 import {
+  type CommunityEventRow,
   type CommunityEventView,
   createCommunityEvent,
   deleteCommunityEvent,
-  fetchCommunityEvents,
+  fetchCommunityEventRows,
   joinCommunityEvent,
   leaveCommunityEvent,
+  mapEventRowsToViews,
   updateCommunityEvent,
 } from "../lib/community-events";
 import { useCommunityProfiles } from "../context/community-profiles-context";
@@ -83,13 +85,16 @@ function formFromEvent(ev: CommunityEventView): EventForm {
 }
 
 export function EventsCalendar() {
-  const { rows, loading: profilesLoading, error: profilesError, reload: reloadProfiles } =
-    useCommunityProfiles();
+  const { rows, loading: profilesLoading, error: profilesError } = useCommunityProfiles();
   const { user, loading: authLoading, error: roleError, canModerate } = useAuthRole();
 
   const profileRows = useMemo(() => rows.map((r) => ({ id: r.id, name: r.name })), [rows]);
 
-  const [events, setEvents] = useState<CommunityEventView[]>([]);
+  const [eventRowsRaw, setEventRowsRaw] = useState<CommunityEventRow[]>([]);
+  const events = useMemo(
+    () => mapEventRowsToViews(eventRowsRaw, profileRows),
+    [eventRowsRaw, profileRows],
+  );
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
 
@@ -112,21 +117,21 @@ export function EventsCalendar() {
     setEventsLoading(true);
     setEventsError(null);
     try {
-      const list = await fetchCommunityEvents(profileRows);
-      setEvents(list);
+      const list = await fetchCommunityEventRows();
+      setEventRowsRaw(list);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Could not load events.";
       setEventsError(msg);
-      setEvents([]);
+      setEventRowsRaw([]);
     } finally {
       setEventsLoading(false);
     }
-  }, [profileRows]);
+  }, [supabaseConfigured]);
 
   useEffect(() => {
     if (!supabaseConfigured || profilesLoading) return;
     void loadEvents();
-  }, [loadEvents, profilesLoading]);
+  }, [loadEvents, profilesLoading, supabaseConfigured]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -163,7 +168,6 @@ export function EventsCalendar() {
       setNewEvent(emptyForm());
       setCreateOpen(false);
       await loadEvents();
-      void reloadProfiles({ silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create event.");
     } finally {
@@ -233,7 +237,6 @@ export function EventsCalendar() {
         toast.success("You’re attending.");
       }
       await loadEvents();
-      void reloadProfiles({ silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not update RSVP.");
     } finally {

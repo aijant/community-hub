@@ -176,9 +176,14 @@ function invokeErrorMessage(error: { message?: string } | null, data: unknown): 
   return error?.message?.trim() || "Request failed.";
 }
 
-export async function fetchCommunityPosts(profileRows: { id: string; name: string; avatar: string }[]) {
+export async function fetchCommunityPostsRaw(): Promise<unknown> {
   const { data, error } = await supabase.functions.invoke("community-get-posts", { method: "GET" });
   if (error) throw new Error(invokeErrorMessage(error, data));
+  return data;
+}
+
+export async function fetchCommunityPosts(profileRows: { id: string; name: string; avatar: string }[]) {
+  const data = await fetchCommunityPostsRaw();
   return mapPostsResponse(data, profileRows);
 }
 
