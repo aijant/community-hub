@@ -141,6 +141,22 @@ export function getCommunityProfileIdForUser(
   return null;
 }
 
+/**
+ * `author_id` for `community-create-post`: prefers a real community profile UUID.
+ * When `staffAuthUserFallback` is true and there is no profile, returns the Supabase auth user id
+ * so admin/manager can post without LinkedIn. The Edge Function must allow that for staff roles.
+ */
+export function resolveMessageBoardAuthorId(
+  user: User | null,
+  rows: CommunityProfileRow[],
+  opts: { staffAuthUserFallback: boolean },
+): string | null {
+  const profileId = getCommunityProfileIdForUser(user, rows);
+  if (profileId) return profileId;
+  if (opts.staffAuthUserFallback && user?.id) return user.id;
+  return null;
+}
+
 const PIN_ROLES = new Set(["admin", "manager"]);
 
 /** Case-insensitive: only admin and manager may pin/unpin. */
