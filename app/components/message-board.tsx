@@ -34,7 +34,7 @@ import {
 } from "./ui/dialog";
 import { cn } from "./ui/utils";
 import { supabaseConfigured } from "../lib/supabase-client";
-import { getCommunityProfileIdForUser, resolveMessageBoardAuthorId } from "../lib/community-profiles";
+import { getCommunityProfileIdForUser } from "../lib/community-profiles";
 import type { PostCategory } from "../lib/community-post-types";
 import { DEFAULT_POST_CHANNEL } from "../lib/community-post-types";
 import type { BoardPostView } from "../lib/community-posts";
@@ -80,11 +80,6 @@ export function MessageBoard() {
   const myCommunityProfileId = useMemo(
     () => getCommunityProfileIdForUser(user, rows),
     [user, rows],
-  );
-
-  const boardAuthorId = useMemo(
-    () => resolveMessageBoardAuthorId(user, rows, { staffAuthUserFallback: canModerate }),
-    [user, rows, canModerate],
   );
 
   const [posts, setPosts] = useState<BoardPostView[]>([]);
@@ -142,13 +137,13 @@ export function MessageBoard() {
   };
 
   const handleAddPost = async () => {
-    if (!newPost.trim() || !boardAuthorId || !supabaseConfigured || !user) return;
+    if (!newPost.trim() || !myCommunityProfileId || !supabaseConfigured || !user) return;
     setSubmitting(true);
     try {
       await createCommunityPost({
         content: newPost.trim(),
         category: selectedCategory,
-        authorId: boardAuthorId,
+        authorId: myCommunityProfileId,
         channel: DEFAULT_POST_CHANNEL,
         isPinned: false,
       });
@@ -316,7 +311,7 @@ export function MessageBoard() {
   };
 
   const composerDisabled =
-    !supabaseConfigured || authLoading || !user || !boardAuthorId;
+    !supabaseConfigured || authLoading || !user || !myCommunityProfileId;
 
   return (
     <div className="space-y-4">
@@ -345,15 +340,15 @@ export function MessageBoard() {
 
       {profilesError ? (
         <p className="text-sm text-red-700">
-          Profiles could not load. You can still post with <span className="font-medium">Add my profile</span>{" "}
-          (LinkedIn), or as an admin or manager without a resident profile.
+          Profiles could not load. You can still post if you have added your profile via{" "}
+          <span className="font-medium">Add my profile</span> (LinkedIn).
         </p>
       ) : null}
 
-      {supabaseConfigured && user && !authLoading && !boardAuthorId ? (
+      {supabaseConfigured && user && !authLoading && !myCommunityProfileId ? (
         <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
           Add your community profile with <span className="font-medium">Add my profile</span> to post on
-          the board, or sign in as an admin or manager.
+          the board.
         </p>
       ) : null}
 
