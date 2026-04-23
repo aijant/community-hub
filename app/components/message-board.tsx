@@ -340,15 +340,13 @@ export function MessageBoard() {
 
       {profilesError ? (
         <p className="text-sm text-red-700">
-          Profiles could not load. You can still post if you have added your profile via{" "}
-          <span className="font-medium">Add my profile</span> (LinkedIn).
+          Profiles could not load. You can still post if your account is linked to a community profile.
         </p>
       ) : null}
 
       {supabaseConfigured && user && !authLoading && !myCommunityProfileId ? (
         <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-          Add your community profile with <span className="font-medium">Add my profile</span> to post on
-          the board.
+          Your account needs a linked community profile to post on the board.
         </p>
       ) : null}
 
