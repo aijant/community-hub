@@ -34,10 +34,6 @@ import {
 } from "./ui/dialog";
 import { cn } from "./ui/utils";
 import { supabaseConfigured } from "../lib/supabase-client";
-import {
-  getCommunityProfileIdForUser,
-  getCommunityProfileLinkStatus,
-} from "../lib/community-profiles";
 import type { PostCategory } from "../lib/community-post-types";
 import { DEFAULT_POST_CHANNEL } from "../lib/community-post-types";
 import type { BoardPostView } from "../lib/community-posts";
@@ -78,16 +74,6 @@ export function MessageBoard() {
   const profileEnrichmentKey = useMemo(
     () => rows.map((r) => `${r.id}\t${r.name}\t${r.avatar}`).join("\n"),
     [rows],
-  );
-
-  const myCommunityProfileId = useMemo(
-    () => getCommunityProfileIdForUser(user, rows),
-    [user, rows],
-  );
-
-  const communityProfileLinkStatus = useMemo(
-    () => getCommunityProfileLinkStatus(user, rows),
-    [user, rows],
   );
 
   /** All signed-in users may create posts; staff may also moderate others' posts and pin. */
@@ -148,13 +134,13 @@ export function MessageBoard() {
   };
 
   const handleAddPost = async () => {
-    if (!newPost.trim() || !myCommunityProfileId || !supabaseConfigured || !user) return;
+    if (!newPost.trim() || !supabaseConfigured || !user) return;
     setSubmitting(true);
     try {
       await createCommunityPost({
         content: newPost.trim(),
         category: selectedCategory,
-        authorId: myCommunityProfileId,
+        createdByUserId: user.id,
         channel: DEFAULT_POST_CHANNEL,
         isPinned: false,
       });
@@ -226,11 +212,8 @@ export function MessageBoard() {
     const isOwnerByAuth = Boolean(
       user?.id && post.createdByUserId && post.createdByUserId === user.id,
     );
-    const isOwnerByProfile = Boolean(
-      !canModerate && myCommunityProfileId && post.authorId === myCommunityProfileId,
-    );
     const showPin = canPin;
-    const showEditDelete = canModerate || isOwnerByAuth || isOwnerByProfile;
+    const showEditDelete = canModerate || isOwnerByAuth;
     const showMenu = showPin || showEditDelete;
 
     const whatsappIntegration = post.channel.trim().toLowerCase() === "whatsapp";
@@ -319,7 +302,7 @@ export function MessageBoard() {
     );
   };
 
-  const composerDisabled = !showCreateComposer || !myCommunityProfileId;
+  const composerDisabled = !showCreateComposer;
 
   return (
     <div className="space-y-4">
@@ -347,24 +330,7 @@ export function MessageBoard() {
       ) : null}
 
       {profilesError ? (
-        <p className="text-sm text-red-700">
-          Profiles could not load. You can still post if your account is linked to a community profile.
-        </p>
-      ) : null}
-
-      {showCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "missing_link" ? (
-        <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-          Your account needs a linked community profile to post on the board (match by email, auth id, or{" "}
-          <code className="text-xs bg-gray-100 px-1 rounded">user_metadata.community_profile</code>).
-        </p>
-      ) : null}
-
-      {showCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "placeholder_profile_id" ? (
-        <p className="text-sm text-amber-900 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
-          Your directory row has no real profile id from the server. Ask an admin to fix the profile record, or set{" "}
-          <code className="text-xs bg-amber-100/80 px-1 rounded">community_profile</code> in your user metadata to a
-          valid UUID.
-        </p>
+        <p className="text-sm text-red-700">Profiles could not load. Name avatars in posts may be incomplete.</p>
       ) : null}
 
       {showCreateComposer ? (

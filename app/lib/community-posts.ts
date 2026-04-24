@@ -187,10 +187,15 @@ export async function fetchCommunityPosts(profileRows: { id: string; name: strin
   return mapPostsResponse(data, profileRows);
 }
 
+/**
+ * Creates a post as the signed-in user. Edge should set `created_by` from JWT or trust this
+ * `created_by` (Supabase `auth.users` id). Do not require `user_metadata.community_profile` on the client.
+ */
 export async function createCommunityPost(input: {
   content: string;
   category: PostCategory;
-  authorId: string;
+  /** Supabase auth user id (`auth.users.id`) — same as Events `created_by`. */
+  createdByUserId: string;
   channel?: string;
   isPinned: boolean;
 }) {
@@ -198,7 +203,7 @@ export async function createCommunityPost(input: {
     body: {
       content: input.content,
       type_id: POST_TYPE_IDS[input.category],
-      author_id: input.authorId,
+      created_by: input.createdByUserId,
       channel: input.channel ?? DEFAULT_POST_CHANNEL,
       is_pinned: input.isPinned,
     },

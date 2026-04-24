@@ -40,9 +40,7 @@ export async function fetchCommunityProfilesJson(): Promise<CommunityProfilesRes
   if (!res.ok) {
     throw new Error(`Failed to load profiles (${res.status})`);
   }
-  const data = (await res.json()) as CommunityProfilesResponse;
-  console.log("[get_community_profiles] response", data);
-  return data;
+  return (await res.json()) as CommunityProfilesResponse;
 }
 
 export function formatRoom(room: string | null | undefined): string {
