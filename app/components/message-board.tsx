@@ -44,6 +44,7 @@ import {
   fetchCommunityPostsRaw,
   mapPostsResponse,
 } from "../lib/community-posts";
+import { getCommunityProfileIdForUser } from "../lib/community-profiles";
 import { useCommunityProfiles } from "../context/community-profiles-context";
 import { useAuthRole } from "../hooks/use-auth-role";
 
@@ -74,6 +75,11 @@ export function MessageBoard() {
   const profileEnrichmentKey = useMemo(
     () => rows.map((r) => `${r.id}\t${r.name}\t${r.avatar}`).join("\n"),
     [rows],
+  );
+
+  const myCommunityProfileId = useMemo(
+    () => getCommunityProfileIdForUser(user, rows),
+    [user, rows],
   );
 
   /** All signed-in users may create posts; staff may also moderate others' posts and pin. */
@@ -212,8 +218,12 @@ export function MessageBoard() {
     const isOwnerByAuth = Boolean(
       user?.id && post.createdByUserId && post.createdByUserId === user.id,
     );
+    /** When API omits `created_by`, match post's community author id to the signed-in profile. */
+    const isOwnerByProfile = Boolean(
+      !canModerate && myCommunityProfileId && post.authorId === myCommunityProfileId,
+    );
     const showPin = canPin;
-    const showEditDelete = canModerate || isOwnerByAuth;
+    const showEditDelete = canModerate || isOwnerByAuth || isOwnerByProfile;
     const showMenu = showPin || showEditDelete;
 
     const whatsappIntegration = post.channel.trim().toLowerCase() === "whatsapp";

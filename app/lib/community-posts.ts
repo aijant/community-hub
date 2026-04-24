@@ -92,6 +92,42 @@ function extractPostsPayload(data: unknown): unknown[] {
   return [];
 }
 
+/**
+ * Resolves the Supabase auth user id of the post creator. APIs vary: top-level
+ * `created_by`, nested `author.user_id`, or `user.id`.
+ */
+function pickAuthUserIdForPost(
+  o: Record<string, unknown>,
+  nestedAuthor: Record<string, unknown> | null,
+): string | null {
+  const fromTop = pickString(o, [
+    "created_by",
+    "createdBy",
+    "creator_id",
+    "user_id",
+    "auth_user_id",
+    "supabase_user_id",
+    "author_user_id",
+  ]);
+  if (fromTop) return fromTop;
+  if (nestedAuthor) {
+    const fromAuthor = pickString(nestedAuthor, [
+      "user_id",
+      "auth_user_id",
+      "supabase_user_id",
+      "created_by",
+      "authId",
+    ]);
+    if (fromAuthor) return fromAuthor;
+  }
+  const userObj = asRecord(o["user"]) ?? asRecord(o["User"]) ?? asRecord(o["auth_user"]);
+  if (userObj) {
+    const u = pickString(userObj, ["id", "user_id", "sub"]);
+    if (u) return u;
+  }
+  return null;
+}
+
 function mapOnePost(raw: unknown, profileLookup: Map<string, { name: string; avatar: string }>): BoardPostView | null {
   const o = asRecord(raw);
   if (!o) return null;
@@ -110,8 +146,7 @@ function mapOnePost(raw: unknown, profileLookup: Map<string, { name: string; ava
     authorIdFromNested ||
     pickString(o, ["author_id", "authorId", "profile_id", "community_profile_id"]);
 
-  const createdByUserIdRaw = pickString(o, ["created_by", "createdBy", "user_id"]);
-  const createdByUserId = createdByUserIdRaw || null;
+  const createdByUserId = pickAuthUserIdForPost(o, nestedAuthor);
 
   let authorName = pickString(o, ["author_name", "authorName", "name", "display_name"]);
   let avatar = pickString(o, ["author_avatar", "avatar_url", "avatarUrl", "avatar"]);
