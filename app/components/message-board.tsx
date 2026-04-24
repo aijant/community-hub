@@ -34,7 +34,10 @@ import {
 } from "./ui/dialog";
 import { cn } from "./ui/utils";
 import { supabaseConfigured } from "../lib/supabase-client";
-import { getCommunityProfileIdForUser } from "../lib/community-profiles";
+import {
+  getCommunityProfileIdForUser,
+  getCommunityProfileLinkStatus,
+} from "../lib/community-profiles";
 import type { PostCategory } from "../lib/community-post-types";
 import { DEFAULT_POST_CHANNEL } from "../lib/community-post-types";
 import type { BoardPostView } from "../lib/community-posts";
@@ -60,7 +63,7 @@ export function MessageBoard() {
   const { rows, loading: profilesLoading, error: profilesError, reload: reloadProfiles } =
     useCommunityProfiles();
 
-  const { user, loading: authLoading, error: roleError, canPin, canModerate, isClient } = useAuthRole();
+  const { user, loading: authLoading, error: roleError, canPin, canModerate } = useAuthRole();
 
   const profileLookup = useMemo(
     () => rows.map((r) => ({ id: r.id, name: r.name, avatar: r.avatar })),
@@ -80,6 +83,16 @@ export function MessageBoard() {
   const myCommunityProfileId = useMemo(
     () => getCommunityProfileIdForUser(user, rows),
     [user, rows],
+  );
+
+  const communityProfileLinkStatus = useMemo(
+    () => getCommunityProfileLinkStatus(user, rows),
+    [user, rows],
+  );
+
+  /** Residents create posts; staff moderate (pin, edit, delete) without creating. */
+  const showResidentCreateComposer = Boolean(
+    supabaseConfigured && user && !authLoading && !canPin,
   );
 
   const [posts, setPosts] = useState<BoardPostView[]>([]);
@@ -137,6 +150,7 @@ export function MessageBoard() {
   };
 
   const handleAddPost = async () => {
+    if (canPin) return;
     if (!newPost.trim() || !myCommunityProfileId || !supabaseConfigured || !user) return;
     setSubmitting(true);
     try {
@@ -215,13 +229,11 @@ export function MessageBoard() {
     const isOwnerByAuth = Boolean(
       user?.id && post.createdByUserId && post.createdByUserId === user.id,
     );
-    const isOwnerByClientProfile = Boolean(
-      isClient &&
-        myCommunityProfileId &&
-        post.authorId === myCommunityProfileId,
+    const isOwnerByProfile = Boolean(
+      !canModerate && myCommunityProfileId && post.authorId === myCommunityProfileId,
     );
     const showPin = canPin;
-    const showEditDelete = canModerate || isOwnerByAuth || isOwnerByClientProfile;
+    const showEditDelete = canModerate || isOwnerByAuth || isOwnerByProfile;
     const showMenu = showPin || showEditDelete;
 
     const whatsappIntegration = post.channel.trim().toLowerCase() === "whatsapp";
@@ -311,7 +323,7 @@ export function MessageBoard() {
   };
 
   const composerDisabled =
-    !supabaseConfigured || authLoading || !user || !myCommunityProfileId;
+    !showResidentCreateComposer || !myCommunityProfileId;
 
   return (
     <div className="space-y-4">
@@ -344,56 +356,72 @@ export function MessageBoard() {
         </p>
       ) : null}
 
-      {supabaseConfigured && user && !authLoading && !myCommunityProfileId ? (
-        <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-          Your account needs a linked community profile to post on the board.
+      {supabaseConfigured && user && !authLoading && canPin ? (
+        <p className="text-sm text-gray-700 rounded-md border border-sky-100 bg-sky-50/80 px-3 py-2">
+          Admins and managers do not create new posts here. Use the menu on each post to pin, edit, or delete.
         </p>
       ) : null}
 
-      {/* Create Post */}
-      <Card className="p-4 bg-white border border-gray-200 shadow-sm">
-        <div className="space-y-3">
-          <Textarea
-            placeholder="Share something with your housemates..."
-            value={newPost}
-            onChange={(e) => setNewPost(e.target.value)}
-            className="min-h-[80px] resize-none text-sm"
-            disabled={composerDisabled}
-          />
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex gap-1.5 flex-wrap">
-              {(Object.keys(categoryConfig) as PostCategory[]).map((category) => {
-                const config = categoryConfig[category];
-                const Icon = config.icon;
-                return (
-                  <Button
-                    key={category}
-                    type="button"
-                    variant={selectedCategory === category ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCategory(category)}
-                    className="gap-1.5 h-8 text-xs"
-                    disabled={composerDisabled}
-                  >
-                    <Icon className="w-3 h-3" />
-                    {config.label}
-                  </Button>
-                );
-              })}
+      {showResidentCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "missing_link" ? (
+        <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+          Your account needs a linked community profile to post on the board (match by email, auth id, or{" "}
+          <code className="text-xs bg-gray-100 px-1 rounded">user_metadata.community_profile</code>).
+        </p>
+      ) : null}
+
+      {showResidentCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "placeholder_profile_id" ? (
+        <p className="text-sm text-amber-900 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+          Your directory row has no real profile id from the server. Ask an admin to fix the profile record, or set{" "}
+          <code className="text-xs bg-amber-100/80 px-1 rounded">community_profile</code> in your user metadata to a
+          valid UUID.
+        </p>
+      ) : null}
+
+      {showResidentCreateComposer ? (
+        <Card className="p-4 bg-white border border-gray-200 shadow-sm">
+          <div className="space-y-3">
+            <Textarea
+              placeholder="Share something with your housemates..."
+              value={newPost}
+              onChange={(e) => setNewPost(e.target.value)}
+              className="min-h-[80px] resize-none text-sm"
+              disabled={composerDisabled}
+            />
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex gap-1.5 flex-wrap">
+                {(Object.keys(categoryConfig) as PostCategory[]).map((category) => {
+                  const config = categoryConfig[category];
+                  const Icon = config.icon;
+                  return (
+                    <Button
+                      key={category}
+                      type="button"
+                      variant={selectedCategory === category ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedCategory(category)}
+                      className="gap-1.5 h-8 text-xs"
+                      disabled={composerDisabled}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {config.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              <Button
+                type="button"
+                onClick={() => void handleAddPost()}
+                disabled={composerDisabled || !newPost.trim() || submitting}
+                size="sm"
+                className="gap-2"
+              >
+                {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                Post
+              </Button>
             </div>
-            <Button
-              type="button"
-              onClick={() => void handleAddPost()}
-              disabled={composerDisabled || !newPost.trim() || submitting}
-              size="sm"
-              className="gap-2"
-            >
-              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              Post
-            </Button>
           </div>
-        </div>
-      </Card>
+        </Card>
+      ) : null}
 
       {postsError ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

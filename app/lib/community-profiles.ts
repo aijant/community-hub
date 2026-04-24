@@ -40,7 +40,9 @@ export async function fetchCommunityProfilesJson(): Promise<CommunityProfilesRes
   if (!res.ok) {
     throw new Error(`Failed to load profiles (${res.status})`);
   }
-  return res.json();
+  const data = (await res.json()) as CommunityProfilesResponse;
+  console.log("[get_community_profiles] response", data);
+  return data;
 }
 
 export function formatRoom(room: string | null | undefined): string {
@@ -139,6 +141,23 @@ export function getCommunityProfileIdForUser(
     return meta;
   }
   return null;
+}
+
+/**
+ * Why posting can be disabled even when a profile row is matched: API may omit a real UUID
+ * (synthetic `profile-0` ids) or auth may lack `user_metadata.community_profile`.
+ */
+export function getCommunityProfileLinkStatus(
+  user: User | null,
+  rows: CommunityProfileRow[],
+): "not_signed_in" | "linked" | "missing_link" | "placeholder_profile_id" {
+  if (!user) return "not_signed_in";
+  if (getCommunityProfileIdForUser(user, rows) != null) return "linked";
+  const meta = getCommunityProfileId(user);
+  if (meta && isPlaceholderCommunityProfileId(meta)) return "placeholder_profile_id";
+  const matched = findCommunityProfileForAuthUser(user, rows);
+  if (matched && isPlaceholderCommunityProfileId(matched.id)) return "placeholder_profile_id";
+  return "missing_link";
 }
 
 const PIN_ROLES = new Set(["admin", "manager"]);

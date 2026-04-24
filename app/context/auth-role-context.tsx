@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase-client";
+import { getCommunityProfileId } from "../lib/supabase-user-metadata";
 
 type AuthRoleContextValue = {
   user: User | null;
@@ -126,6 +127,17 @@ export function AuthRoleProvider({ children }: { children: ReactNode }) {
   const canPin = normalized === "admin" || normalized === "manager";
   const canModerate = canPin;
   const isClient = normalized === "client";
+
+  useEffect(() => {
+    if (!user) {
+      console.log("[user_metadata.community_profile]", null);
+      return;
+    }
+    const raw = user.user_metadata as Record<string, unknown> | undefined;
+    console.log("[user_metadata.community_profile]", getCommunityProfileId(user), {
+      full_user_metadata: raw,
+    });
+  }, [user]);
 
   const value = useMemo(
     () => ({
