@@ -90,10 +90,8 @@ export function MessageBoard() {
     [user, rows],
   );
 
-  /** Residents create posts; staff moderate (pin, edit, delete) without creating. */
-  const showResidentCreateComposer = Boolean(
-    supabaseConfigured && user && !authLoading && !canPin,
-  );
+  /** All signed-in users may create posts; staff may also moderate others' posts and pin. */
+  const showCreateComposer = Boolean(supabaseConfigured && user && !authLoading);
 
   const [posts, setPosts] = useState<BoardPostView[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
@@ -150,7 +148,6 @@ export function MessageBoard() {
   };
 
   const handleAddPost = async () => {
-    if (canPin) return;
     if (!newPost.trim() || !myCommunityProfileId || !supabaseConfigured || !user) return;
     setSubmitting(true);
     try {
@@ -322,8 +319,7 @@ export function MessageBoard() {
     );
   };
 
-  const composerDisabled =
-    !showResidentCreateComposer || !myCommunityProfileId;
+  const composerDisabled = !showCreateComposer || !myCommunityProfileId;
 
   return (
     <div className="space-y-4">
@@ -356,20 +352,14 @@ export function MessageBoard() {
         </p>
       ) : null}
 
-      {supabaseConfigured && user && !authLoading && canPin ? (
-        <p className="text-sm text-gray-700 rounded-md border border-sky-100 bg-sky-50/80 px-3 py-2">
-          Admins and managers do not create new posts here. Use the menu on each post to pin, edit, or delete.
-        </p>
-      ) : null}
-
-      {showResidentCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "missing_link" ? (
+      {showCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "missing_link" ? (
         <p className="text-sm text-gray-700 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
           Your account needs a linked community profile to post on the board (match by email, auth id, or{" "}
           <code className="text-xs bg-gray-100 px-1 rounded">user_metadata.community_profile</code>).
         </p>
       ) : null}
 
-      {showResidentCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "placeholder_profile_id" ? (
+      {showCreateComposer && !myCommunityProfileId && communityProfileLinkStatus === "placeholder_profile_id" ? (
         <p className="text-sm text-amber-900 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
           Your directory row has no real profile id from the server. Ask an admin to fix the profile record, or set{" "}
           <code className="text-xs bg-amber-100/80 px-1 rounded">community_profile</code> in your user metadata to a
@@ -377,7 +367,7 @@ export function MessageBoard() {
         </p>
       ) : null}
 
-      {showResidentCreateComposer ? (
+      {showCreateComposer ? (
         <Card className="p-4 bg-white border border-gray-200 shadow-sm">
           <div className="space-y-3">
             <Textarea
