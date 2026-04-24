@@ -14,7 +14,7 @@ The Community Hub app no longer sends `author_id` (community profile UUID). The 
 
 ## `community-get-posts`
 
-Return each post with `created_by` (or `createdBy`) set so the UI can show Edit/Delete only for the author or for admin/manager (role checked on the client via `user_roles`).
+Return each post with `created_by` (or `createdBy`) set on every row, **like** `community_events.created_by`, so the UI can match the signed-in user without heuristics. Optional: also expose author `email` if you use it for display. The client falls back to email display / profile id when `created_by` is missing, but the DB should still provide `created_by` when possible.
 
 ## RLS / policies
 

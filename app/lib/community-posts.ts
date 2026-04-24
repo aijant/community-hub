@@ -27,6 +27,8 @@ export interface BoardPostView {
   channel: string;
   /** Supabase auth user id of creator (`created_by` on post). Used for client edit/delete ownership. */
   createdByUserId: string | null;
+  /** When API exposes author email (e.g. author.email), used to match the signed-in user. */
+  authorEmail: string | null;
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -128,6 +130,40 @@ function pickAuthUserIdForPost(
   return null;
 }
 
+function pickAuthorEmail(
+  o: Record<string, unknown>,
+  nestedAuthor: Record<string, unknown> | null,
+): string | null {
+  const fromTop = pickString(o, [
+    "author_email",
+    "authorEmail",
+    "user_email",
+    "userEmail",
+    "creator_email",
+  ]);
+  if (fromTop.includes("@")) return fromTop.trim();
+  if (nestedAuthor) {
+    const fromNested = pickString(nestedAuthor, [
+      "email",
+      "user_email",
+      "userEmail",
+      "author_email",
+    ]);
+    if (fromNested.includes("@")) return fromNested.trim();
+    const authorUser = asRecord(nestedAuthor["user"]);
+    if (authorUser) {
+      const e = pickString(authorUser, ["email", "user_email"]);
+      if (e.includes("@")) return e.trim();
+    }
+  }
+  const topUser = asRecord(o["user"]) ?? asRecord(o["User"]);
+  if (topUser) {
+    const e = pickString(topUser, ["email", "user_email"]);
+    if (e.includes("@")) return e.trim();
+  }
+  return null;
+}
+
 function mapOnePost(raw: unknown, profileLookup: Map<string, { name: string; avatar: string }>): BoardPostView | null {
   const o = asRecord(raw);
   if (!o) return null;
@@ -147,6 +183,7 @@ function mapOnePost(raw: unknown, profileLookup: Map<string, { name: string; ava
     pickString(o, ["author_id", "authorId", "profile_id", "community_profile_id"]);
 
   const createdByUserId = pickAuthUserIdForPost(o, nestedAuthor);
+  const authorEmail = pickAuthorEmail(o, nestedAuthor);
 
   let authorName = pickString(o, ["author_name", "authorName", "name", "display_name"]);
   let avatar = pickString(o, ["author_avatar", "avatar_url", "avatarUrl", "avatar"]);
@@ -184,6 +221,7 @@ function mapOnePost(raw: unknown, profileLookup: Map<string, { name: string; ava
     isPinned,
     channel,
     createdByUserId,
+    authorEmail,
   };
 }
 
