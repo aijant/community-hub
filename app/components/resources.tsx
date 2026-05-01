@@ -12,8 +12,6 @@ import {
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { downloadCommunityDocument } from "../lib/download-community-document";
-import { supabaseConfigured } from "../lib/supabase-client";
 import { QuickAccess } from "./quick-access";
 
 const COMMUNITY_DOCUMENTS_URL =
@@ -39,6 +37,7 @@ export interface ApiDocument {
   updated_at: string;
   uploaded_by: string;
   type: ApiDocumentType;
+  signed_url: string | null;
 }
 
 interface CommunityDocumentsResponse {
@@ -82,7 +81,6 @@ export function Resources() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ResourceKind | "all">("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
@@ -90,9 +88,7 @@ export function Resources() {
     setError(null);
     try {
       const res = await fetch(COMMUNITY_DOCUMENTS_URL);
-      if (!res.ok) {
-        throw new Error(`Failed to load resources (${res.status})`);
-      }
+      if (!res.ok) throw new Error(`Failed to load resources (${res.status})`);
       const data: CommunityDocumentsResponse = await res.json();
       setDocuments(data.documents ?? []);
     } catch (e) {
@@ -109,9 +105,7 @@ export function Resources() {
 
   const kindsOnServer = useMemo(() => {
     const s = new Set<ResourceKind>();
-    for (const d of documents) {
-      s.add(d.type.value);
-    }
+    for (const d of documents) s.add(d.type.value);
     return s;
   }, [documents]);
 
@@ -120,23 +114,23 @@ export function Resources() {
     return documents.filter((d) => d.type.value === filter);
   }, [documents, filter]);
 
-  const handleOpen = async (doc: ApiDocument) => {
-    const kind = doc.type.value;
-    if (kind === "link" && doc.link?.trim()) {
+  const handleOpen = (doc: ApiDocument) => {
+    setDownloadError(null);
+
+    // Link-type: open the URL directly
+    if (doc.type.value === "link" && doc.link?.trim()) {
       window.open(normalizeLink(doc.link), "_blank", "noopener,noreferrer");
       return;
     }
-    if (!doc.file_path?.trim() || !supabaseConfigured) return;
 
-    setDownloadingId(doc.id);
-    setDownloadError(null);
-    try {
-      await downloadCommunityDocument(doc.file_path, doc.file_name || doc.title);
-    } catch (e) {
-      setDownloadError(e instanceof Error ? e.message : "Download failed.");
-    } finally {
-      setDownloadingId(null);
+    // File-type: use the server-issued signed URL — no client-side signing needed
+    if (doc.signed_url) {
+      window.open(doc.signed_url, "_blank", "noopener,noreferrer");
+      return;
     }
+
+    // signed_url is null → file was deleted from storage
+    setDownloadError(`"${doc.title}" is no longer available. Please contact an administrator.`);
   };
 
   const copyFileName = async (doc: ApiDocument) => {
@@ -183,15 +177,6 @@ export function Resources() {
         </div>
       </div>
 
-      {!supabaseConfigured && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          File downloads need{" "}
-          <code className="rounded bg-amber-100/80 px-1 py-0.5 text-xs">VITE_SUPABASE_URL</code> and{" "}
-          <code className="rounded bg-amber-100/80 px-1 py-0.5 text-xs">VITE_SUPABASE_ANON_KEY</code>{" "}
-          in your environment.
-        </div>
-      )}
-
       {downloadError && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           <span>{downloadError}</span>
@@ -226,34 +211,25 @@ export function Resources() {
             const config = typeConfig[kind] ?? typeConfig.document;
             const Icon = config.icon;
             const isLink = kind === "link" && !!doc.link?.trim();
-            const hasFile = !!doc.file_path?.trim() && kind !== "link";
-            const canDownloadFile = hasFile && supabaseConfigured;
-            const canOpen = isLink || canDownloadFile;
+            const hasFile = kind !== "link" && !!doc.file_path?.trim();
+            const canOpen = isLink || !!doc.signed_url;
             const sizeLabel = formatBytes(doc.file_size);
-            const isBusy = downloadingId === doc.id;
 
             return (
               <Card
                 key={doc.id}
                 id={`resource-${doc.id}`}
                 className={`scroll-mt-24 p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200 group ${
-                  canOpen && !isBusy ? "cursor-pointer" : ""
-                } ${isBusy ? "opacity-80 pointer-events-none" : ""}`}
-                onClick={() => {
-                  if (!canOpen || isBusy) return;
-                  void handleOpen(doc);
-                }}
+                  canOpen ? "cursor-pointer" : "opacity-60"
+                }`}
+                onClick={() => handleOpen(doc)}
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                      {isBusy ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
-                      ) : (
-                        <Icon className="w-5 h-5 text-gray-700" />
-                      )}
+                      <Icon className="w-5 h-5 text-gray-700" />
                     </div>
-                    {isBusy ? null : canOpen ? (
+                    {canOpen ? (
                       <ExternalLink className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                     ) : hasFile ? (
                       <button
