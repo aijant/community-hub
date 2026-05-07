@@ -24,9 +24,9 @@ export function CommunityChatLinkButtons() {
 
   const whatsappTitle = whatsappOpen
     ? "WhatsApp group (opens in a new tab)"
-    : "Sign in with a client, manager, or admin account to open this link.";
+    : "Sign in with a client or admin-level account to open this link.";
   const telegramTitle = !chatLinksEnabled
-    ? "Sign in with a client, manager, or admin account to open this link."
+    ? "Sign in with a client or admin-level account to open this link."
     : telegramUrl
       ? "Telegram group (opens in a new tab)"
       : "Set TELEGRAM_GROUP_URL in community-chat-link-buttons.tsx.";

@@ -18,4 +18,4 @@ Return each post with `created_by` (or `createdBy`) set on every row, **like** `
 
 ## RLS / policies
 
-Align with: non-moderators update/delete only their `created_by`; moderators (admin/manager) can pin and edit/delete any. See `supabase/community_board_rls_template.sql` for patterns if you use table RLS.
+Align with: non-moderators update/delete only their `created_by`; moderators (admin/manager/superadmin) can pin and edit/delete any. See `supabase/community_board_rls_template.sql` for patterns if you use table RLS.

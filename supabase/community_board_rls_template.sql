@@ -8,12 +8,12 @@
 --
 -- Matrix (as in the app):
 --   Residents: create posts, edit/delete own. No pin.
---   admin / manager: no create, edit/delete any post, set is_pinned.
+--   admin / manager / superadmin: no create, edit/delete any post, set is_pinned.
 --
 -- Requires: public.user_roles(id uuid PK = auth.users.id) with `role` text.
 -- See: supabase/user_roles_policies.sql
 
--- Helper: true when the signed-in user is admin or manager (can moderate / pin).
+-- Helper: true when the signed-in user has an admin-equivalent role (can moderate / pin).
 CREATE OR REPLACE FUNCTION public.is_community_board_moderator()
 RETURNS boolean
 LANGUAGE sql
@@ -25,7 +25,7 @@ AS $$
     SELECT 1
     FROM public.user_roles ur
     WHERE ur.id = auth.uid()
-      AND lower(trim(ur.role)) IN ('admin', 'manager')
+      AND lower(trim(ur.role)) IN ('admin', 'manager', 'superadmin')
   );
 $$;
 

@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { communityRoleCanPin } from "./community-roles";
 import { getCommunityProfileId } from "./supabase-user-metadata";
 
 export const COMMUNITY_PROFILES_URL =
@@ -12,7 +13,7 @@ export interface ApiProfile {
   room: string | null;
   linkedin_url: string | null;
   avatar_url: string | null;
-  /** When present: `admin` and `manager` may pin posts. */
+  /** When present: admin-equivalent roles may pin posts. */
   role?: string | null;
   /** Optional: returned by `get_community_profiles` for some tenants. */
   first_name?: string | null;
@@ -158,10 +159,7 @@ export function getCommunityProfileLinkStatus(
   return "missing_link";
 }
 
-const PIN_ROLES = new Set(["admin", "manager"]);
-
-/** Case-insensitive: only admin and manager may pin/unpin. */
+/** Case-insensitive: admin-equivalent roles may pin/unpin. */
 export function profileRoleCanPin(role: string | null | undefined): boolean {
-  if (!role?.trim()) return false;
-  return PIN_ROLES.has(role.trim().toLowerCase());
+  return communityRoleCanPin(role);
 }

@@ -9,6 +9,11 @@ import {
 } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase-client";
+import {
+  communityRoleCanModerate,
+  communityRoleCanPin,
+  normalizeCommunityRole,
+} from "../lib/community-roles";
 
 type AuthRoleContextValue = {
   user: User | null;
@@ -121,10 +126,10 @@ export function AuthRoleProvider({ children }: { children: ReactNode }) {
     return () => subscription?.unsubscribe();
   }, []);
 
-  const normalized = useMemo(() => role?.trim().toLowerCase() ?? "", [role]);
+  const normalized = useMemo(() => normalizeCommunityRole(role), [role]);
 
-  const canPin = normalized === "admin" || normalized === "manager";
-  const canModerate = canPin;
+  const canPin = communityRoleCanPin(normalized);
+  const canModerate = communityRoleCanModerate(normalized);
   const isClient = normalized === "client";
 
   const value = useMemo(
