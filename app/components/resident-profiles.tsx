@@ -9,6 +9,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from "./ui/carousel";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import { supabaseConfigured } from "../lib/supabase-client";
 import { getCommunityProfileIdForUser } from "../lib/community-profiles";
 import { useCommunityProfiles } from "../context/community-profiles-context";
@@ -158,7 +159,25 @@ export function ResidentProfiles() {
                           <p className="text-xs text-gray-500">{profile.room}</p>
                         </div>
 
-                        <p className="text-xs text-gray-700 line-clamp-2">{profile.bio}</p>
+                        {profile.bio.trim() ? (
+                          <HoverCard openDelay={200} closeDelay={100}>
+                            <HoverCardTrigger asChild>
+                              <button
+                                type="button"
+                                className="text-xs text-gray-700 line-clamp-2 w-full text-center bg-transparent border-0 p-0 font-inherit cursor-help outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded-sm"
+                              >
+                                {profile.bio}
+                              </button>
+                            </HoverCardTrigger>
+                            <HoverCardContent
+                              side="top"
+                              align="center"
+                              className="w-[min(90vw,22rem)] max-h-[min(70vh,24rem)] overflow-y-auto p-5 text-sm text-gray-900 leading-relaxed shadow-lg rounded-xl border border-gray-200"
+                            >
+                              <p className="whitespace-pre-wrap">{profile.bio}</p>
+                            </HoverCardContent>
+                          </HoverCard>
+                        ) : null}
 
                         {profile.linkedinUrl.trim() ? (
                           <a
