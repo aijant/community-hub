@@ -81,7 +81,8 @@ export function mapApiProfileToCommunityRow(api: ApiProfile, index: number): Com
   const emailRaw = pickLooseString(raw, ["email", "user_email"]);
 
   return {
-    id: api.id ?? `profile-${index}`,
+    /** `??` skips only null/undefined — empty id must fall back or list keys collide and React reuses state across cards. */
+    id: api.id?.trim() || `profile-${index}`,
     name: api.name ?? "",
     linkedinUrl: api.linkedin_url ?? "",
     bio: api.description ?? "",
@@ -94,6 +95,29 @@ export function mapApiProfileToCommunityRow(api: ApiProfile, index: number): Com
     userId: userIdRaw || null,
     email: emailRaw || null,
   };
+}
+
+/**
+ * Ensures each row has a distinct `id` so list keys (e.g. carousel slides) are unique.
+ * The API can repeat the same id on multiple profiles; React would reuse one component state for all.
+ */
+export function ensureUniqueProfileRowIds(rows: CommunityProfileRow[]): CommunityProfileRow[] {
+  const seen = new Set<string>();
+  return rows.map((row, index) => {
+    let id = row.id;
+    if (!seen.has(id)) {
+      seen.add(id);
+      return row;
+    }
+    let n = index;
+    let candidate = `${row.id}__${n}`;
+    while (seen.has(candidate)) {
+      n += 1;
+      candidate = `${row.id}__${n}`;
+    }
+    seen.add(candidate);
+    return { ...row, id: candidate };
+  });
 }
 
 /** Match `get_community_profiles` row to the signed-in user (metadata id, then auth id, then email). */

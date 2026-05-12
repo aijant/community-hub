@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { Linkedin, Loader2, RefreshCw, Users } from "lucide-react";
+import { useCallback, useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { ChevronDown, ChevronUp, Linkedin, Loader2, RefreshCw, Users } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -9,7 +9,6 @@ import {
   CarouselContent,
   CarouselItem,
 } from "./ui/carousel";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import { supabaseConfigured } from "../lib/supabase-client";
 import { getCommunityProfileIdForUser } from "../lib/community-profiles";
 import { useCommunityProfiles } from "../context/community-profiles-context";
@@ -35,6 +34,11 @@ export function ResidentProfiles() {
   );
 
   const [refreshing, setRefreshing] = useState(false);
+  const [bioExpandedById, setBioExpandedById] = useState<Record<string, boolean>>({});
+
+  const toggleBioExpanded = useCallback((id: string) => {
+    setBioExpandedById((s) => ({ ...s, [id]: !s[id] }));
+  }, []);
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
   const pauseAutoplayRef = useRef(false);
@@ -123,7 +127,7 @@ export function ResidentProfiles() {
             }}
             className="w-full"
           >
-            <CarouselContent className="-ml-3">
+            <CarouselContent className="-ml-3 items-start">
               {profiles.map((profile) => {
                 const showClientBadge = Boolean(
                   isClient && user && myCommunityProfileId && profile.id === myCommunityProfileId,
@@ -133,8 +137,8 @@ export function ResidentProfiles() {
                     key={profile.id}
                     className="pl-3 basis-full sm:basis-1/2 lg:basis-1/3 xl:basis-1/4"
                   >
-                    <Card className="p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200 h-full">
-                      <div className="flex flex-col items-center text-center space-y-3">
+                    <Card className="w-full max-w-full p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200">
+                      <div className="flex w-full min-w-0 flex-col items-center text-center space-y-3">
                         <div className="relative shrink-0">
                           <Avatar className="w-16 h-16">
                             <AvatarImage src={profile.avatar} alt={profile.name} />
@@ -160,23 +164,12 @@ export function ResidentProfiles() {
                         </div>
 
                         {profile.bio.trim() ? (
-                          <HoverCard openDelay={200} closeDelay={100}>
-                            <HoverCardTrigger asChild>
-                              <button
-                                type="button"
-                                className="text-xs text-gray-700 line-clamp-2 w-full text-center bg-transparent border-0 p-0 font-inherit cursor-help outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded-sm"
-                              >
-                                {profile.bio}
-                              </button>
-                            </HoverCardTrigger>
-                            <HoverCardContent
-                              side="top"
-                              align="center"
-                              className="w-[min(90vw,22rem)] max-h-[min(70vh,24rem)] overflow-y-auto p-5 text-sm text-gray-900 leading-relaxed shadow-lg rounded-xl border border-gray-200"
-                            >
-                              <p className="whitespace-pre-wrap">{profile.bio}</p>
-                            </HoverCardContent>
-                          </HoverCard>
+                          <ResidentBioExpandable
+                            key={profile.id}
+                            bio={profile.bio}
+                            expanded={bioExpandedById[profile.id] ?? false}
+                            onToggle={() => toggleBioExpanded(profile.id)}
+                          />
                         ) : null}
 
                         {profile.linkedinUrl.trim() ? (
@@ -199,6 +192,71 @@ export function ResidentProfiles() {
           </Carousel>
         </div>
       )}
+    </div>
+  );
+}
+
+function ResidentBioExpandable({
+  bio,
+  expanded,
+  onToggle,
+}: {
+  bio: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el || expanded) return;
+
+    const update = () => {
+      const current = textRef.current;
+      if (!current) return;
+      setOverflowing(
+        current.clientHeight > 0 && current.scrollHeight > current.clientHeight + 1,
+      );
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [bio, expanded]);
+
+  const showToggle = overflowing || expanded;
+
+  return (
+    <div className="w-full min-w-0 space-y-2">
+      <div className="w-full min-w-0 overflow-hidden">
+        <p
+          ref={textRef}
+          className={
+            expanded
+              ? "text-xs text-gray-700 text-center whitespace-pre-wrap break-words leading-relaxed"
+              : "text-xs text-gray-700 text-center line-clamp-2 break-words leading-relaxed"
+          }
+        >
+          {bio}
+        </p>
+      </div>
+      {showToggle ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          className="w-full flex items-center justify-center gap-1.5 rounded-full border border-gray-200/80 bg-transparent px-4 py-2.5 text-xs font-medium text-gray-800 outline-none transition-colors hover:border-gray-300 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
+          onClick={onToggle}
+        >
+          {expanded ? "Show less" : "Show more"}
+          {expanded ? (
+            <ChevronUp className="w-3.5 h-3.5 shrink-0" aria-hidden />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden />
+          )}
+        </button>
+      ) : null}
     </div>
   );
 }

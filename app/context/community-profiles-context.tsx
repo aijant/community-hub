@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  ensureUniqueProfileRowIds,
   fetchCommunityProfilesJson,
   mapApiProfileToCommunityRow,
   type CommunityProfileRow,
@@ -34,7 +35,7 @@ export function CommunityProfilesProvider({ children }: { children: ReactNode })
     try {
       const data = await fetchCommunityProfilesJson();
       const list = data.profiles ?? [];
-      setRows(list.map((api, index) => mapApiProfileToCommunityRow(api, index)));
+      setRows(ensureUniqueProfileRowIds(list.map((api, index) => mapApiProfileToCommunityRow(api, index))));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load resident profiles.");
       setRows([]);
