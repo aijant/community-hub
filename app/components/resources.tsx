@@ -248,37 +248,40 @@ export function Resources() {
           {documents.length === 0 ? "No resources yet." : "No items in this category."}
         </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
           {filtered.map((doc) => {
             const kind = doc.type.value;
             const config = typeConfig[kind] ?? typeConfig.document;
             const Icon = config.icon;
             const isLink = !!doc.link?.trim();
             const hasFile = !!doc.file_path?.trim() && !isLink;
-            const canOpen = isLink || !!doc.signed_url;
+            const openFromFile = !!doc.signed_url && !isGuidesAndRulesKind(kind);
+            const canOpen = isLink || openFromFile;
+            const storageFileMissing = hasFile && !doc.signed_url && !isLink;
             const sizeLabel = formatBytes(doc.file_size);
             const guidesHtml =
               isGuidesAndRulesKind(kind) ? guidesRulesHtmlSource(doc) : null;
             const expandableText =
               guidesHtml != null ? htmlToPlainText(guidesHtml) || null : null;
+            const cardMuted = storageFileMissing && expandableText == null;
 
             return (
               <Card
                 key={doc.id}
                 id={`resource-${doc.id}`}
-                className={`scroll-mt-24 p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200 group ${
-                  canOpen ? "cursor-pointer" : "opacity-60"
-                }`}
-                onClick={() => handleOpen(doc)}
+                className={`scroll-mt-24 min-h-[220px] p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200 group ${
+                  canOpen ? "cursor-pointer" : ""
+                } ${cardMuted ? "opacity-60" : ""}`}
+                onClick={canOpen ? () => handleOpen(doc) : undefined}
               >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-1 flex-col min-h-0 gap-3 w-full">
+                  <div className="flex shrink-0 items-start justify-between gap-2">
                     <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
                       <Icon className="w-5 h-5 text-gray-700" />
                     </div>
                     {canOpen ? (
                       <ExternalLink className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    ) : hasFile && !canOpen ? (
+                    ) : storageFileMissing ? (
                       <button
                         type="button"
                         className="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100"
@@ -293,7 +296,7 @@ export function Resources() {
                     ) : null}
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="flex flex-1 flex-col gap-1.5 min-h-0">
                     <h3 className="font-semibold text-gray-900 text-sm leading-tight">{doc.title}</h3>
                     {expandableText != null ? (
                       <ExpandablePlainText text={expandableText} />
@@ -311,7 +314,7 @@ export function Resources() {
                     ) : null}
                   </div>
 
-                  <Badge variant="secondary" className={`gap-1 text-xs ${config.color}`}>
+                  <Badge variant="secondary" className={`shrink-0 gap-1 text-xs ${config.color}`}>
                     {config.label}
                   </Badge>
                 </div>
