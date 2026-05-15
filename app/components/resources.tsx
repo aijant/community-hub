@@ -6,6 +6,8 @@ import {
   FileText,
   Film,
   FolderOpen,
+  Image as ImageIcon,
+  Images,
   Link2,
   Loader2,
 } from "lucide-react";
@@ -13,20 +15,53 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { QuickAccess } from "./quick-access";
+import { ExpandablePlainText } from "./expandable-plain-text";
+import { htmlToPlainText } from "../lib/html-to-plain-text";
 
 const COMMUNITY_DOCUMENTS_URL =
   "https://ksxqwsihrizusoxorrcn.supabase.co/functions/v1/get_community_documents";
 
-type ResourceKind = "document" | "link" | "guide" | "video";
+/** Values from API `document_types`; legacy kinds kept until old rows are migrated. */
+type ApiResourceKind =
+  | "document"
+  | "guides_and_rules"
+  | "media"
+  | "link"
+  | "guide"
+  | "video"
+  | "image";
+
+type ResourceFilter = "all" | "document" | "guides_and_rules" | "media";
+
+const FILTER_KINDS: Record<Exclude<ResourceFilter, "all">, readonly ApiResourceKind[]> = {
+  document: ["document"],
+  guides_and_rules: ["guides_and_rules", "guide", "link"],
+  media: ["media", "video", "image"],
+};
+
+function isGuidesAndRulesKind(kind: ApiResourceKind): boolean {
+  return kind === "guides_and_rules" || kind === "guide" || kind === "link";
+}
+
+/** Primary HTML body from API; falls back to description when absent. */
+function guidesRulesHtmlSource(doc: ApiDocument): string | null {
+  const fromContent = doc.content?.trim();
+  if (fromContent) return doc.content!;
+  const fromDesc = doc.description?.trim();
+  if (fromDesc) return doc.description!;
+  return null;
+}
 
 interface ApiDocumentType {
   id: string;
-  value: ResourceKind;
+  value: ApiResourceKind;
 }
 
 export interface ApiDocument {
   id: string;
   title: string;
+  /** Rich HTML body for guides & rules (preferred over description when present). */
+  content?: string | null;
   description: string | null;
   link: string | null;
   file_name: string;
@@ -53,14 +88,22 @@ interface CommunityDocumentsResponse {
 }
 
 const typeConfig: Record<
-  ResourceKind,
+  ApiResourceKind,
   { icon: typeof FileText; color: string; label: string }
 > = {
   document: { icon: FileText, color: "bg-blue-100 text-blue-700", label: "Document" },
+  guides_and_rules: { icon: BookOpen, color: "bg-green-100 text-green-700", label: "Guides & Rules" },
+  media: { icon: Images, color: "bg-rose-100 text-rose-700", label: "Media" },
   link: { icon: Link2, color: "bg-fuchsia-100 text-fuchsia-800", label: "Link" },
   guide: { icon: BookOpen, color: "bg-green-100 text-green-700", label: "Guide" },
   video: { icon: Film, color: "bg-rose-100 text-rose-700", label: "Video" },
+  image: { icon: ImageIcon, color: "bg-violet-100 text-violet-800", label: "Image" },
 };
+
+function filterHasServerContent(filterKey: ResourceFilter, kinds: Set<ApiResourceKind>): boolean {
+  if (filterKey === "all") return true;
+  return FILTER_KINDS[filterKey].some((k) => kinds.has(k));
+}
 
 function normalizeLink(href: string): string {
   const t = href.trim();
@@ -79,7 +122,7 @@ export function Resources() {
   const [documents, setDocuments] = useState<ApiDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<ResourceKind | "all">("all");
+  const [filter, setFilter] = useState<ResourceFilter>("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
@@ -104,21 +147,22 @@ export function Resources() {
   }, [loadDocuments]);
 
   const kindsOnServer = useMemo(() => {
-    const s = new Set<ResourceKind>();
+    const s = new Set<ApiResourceKind>();
     for (const d of documents) s.add(d.type.value);
     return s;
   }, [documents]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return documents;
-    return documents.filter((d) => d.type.value === filter);
+    const allowed = FILTER_KINDS[filter];
+    return documents.filter((d) => allowed.includes(d.type.value));
   }, [documents, filter]);
 
   const handleOpen = (doc: ApiDocument) => {
     setDownloadError(null);
 
-    // Link-type: open the URL directly
-    if (doc.type.value === "link" && doc.link?.trim()) {
+    // External URL (e.g. guides/rules links): open directly
+    if (doc.link?.trim()) {
       window.open(normalizeLink(doc.link), "_blank", "noopener,noreferrer");
       return;
     }
@@ -144,12 +188,11 @@ export function Resources() {
     }
   };
 
-  const filterButtons: { key: ResourceKind | "all"; label: string }[] = [
+  const filterButtons: { key: ResourceFilter; label: string }[] = [
     { key: "all", label: "All" },
     { key: "document", label: "Documents" },
-    { key: "link", label: "Links" },
-    { key: "guide", label: "Guides" },
-    { key: "video", label: "Videos" },
+    { key: "guides_and_rules", label: "Guides & Rules" },
+    { key: "media", label: "Media" },
   ];
 
   return (
@@ -169,7 +212,7 @@ export function Resources() {
                 filter === key
                   ? "bg-gray-900 text-white border-gray-900"
                   : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-              } ${key !== "all" && !kindsOnServer.has(key as ResourceKind) ? "opacity-40" : ""}`}
+              } ${key !== "all" && !filterHasServerContent(key, kindsOnServer) ? "opacity-40" : ""}`}
             >
               {label}
             </button>
@@ -210,10 +253,14 @@ export function Resources() {
             const kind = doc.type.value;
             const config = typeConfig[kind] ?? typeConfig.document;
             const Icon = config.icon;
-            const isLink = kind === "link" && !!doc.link?.trim();
-            const hasFile = kind !== "link" && !!doc.file_path?.trim();
+            const isLink = !!doc.link?.trim();
+            const hasFile = !!doc.file_path?.trim() && !isLink;
             const canOpen = isLink || !!doc.signed_url;
             const sizeLabel = formatBytes(doc.file_size);
+            const guidesHtml =
+              isGuidesAndRulesKind(kind) ? guidesRulesHtmlSource(doc) : null;
+            const expandableText =
+              guidesHtml != null ? htmlToPlainText(guidesHtml) || null : null;
 
             return (
               <Card
@@ -231,7 +278,7 @@ export function Resources() {
                     </div>
                     {canOpen ? (
                       <ExternalLink className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    ) : hasFile ? (
+                    ) : hasFile && !canOpen ? (
                       <button
                         type="button"
                         className="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100"
@@ -248,10 +295,12 @@ export function Resources() {
 
                   <div className="space-y-1.5">
                     <h3 className="font-semibold text-gray-900 text-sm leading-tight">{doc.title}</h3>
-                    {doc.description ? (
+                    {expandableText != null ? (
+                      <ExpandablePlainText text={expandableText} />
+                    ) : doc.description?.trim() && !isGuidesAndRulesKind(kind) ? (
                       <p className="text-xs text-gray-600 leading-relaxed line-clamp-3">{doc.description}</p>
                     ) : null}
-                    {doc.file_name && kind !== "link" ? (
+                    {doc.file_name && !doc.link?.trim() ? (
                       <p className="text-xs text-gray-500 truncate" title={doc.file_name}>
                         {doc.file_name}
                         {sizeLabel ? ` · ${sizeLabel}` : ""}
