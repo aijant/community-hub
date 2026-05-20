@@ -10,6 +10,7 @@ import {
   Images,
   Link2,
   Loader2,
+  Share2,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -41,6 +42,21 @@ const FILTER_KINDS: Record<Exclude<ResourceFilter, "all">, readonly ApiResourceK
 
 function isGuidesAndRulesKind(kind: ApiResourceKind): boolean {
   return kind === "guides_and_rules" || kind === "guide" || kind === "link";
+}
+
+function isMediaKind(kind: ApiResourceKind): boolean {
+  return kind === "media" || kind === "video" || kind === "image";
+}
+
+function isVideoDoc(doc: ApiDocument): boolean {
+  if (doc.mime_type?.startsWith("video/")) return true;
+  return doc.type.value === "video";
+}
+
+function mediaLabel(doc: ApiDocument): string {
+  if (isVideoDoc(doc)) return "Video";
+  if (doc.mime_type?.startsWith("image/") || doc.type.value === "image") return "Photo";
+  return typeConfig[doc.type.value]?.label ?? "Media";
 }
 
 /** Primary HTML body from API; falls back to description when absent. */
@@ -118,6 +134,94 @@ function formatBytes(n: number | null): string | null {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface MediaItemCardProps {
+  doc: ApiDocument;
+  copiedId: string | null;
+  onOpen: (doc: ApiDocument) => void;
+  onShare: (doc: ApiDocument) => void;
+}
+
+function MediaItemCard({ doc, copiedId, onOpen, onShare }: MediaItemCardProps) {
+  const isVideo = isVideoDoc(doc);
+  const label = mediaLabel(doc);
+  const sizeLabel = formatBytes(doc.file_size);
+  const canOpen = !!doc.signed_url?.trim();
+  const PreviewIcon = isVideo ? Film : ImageIcon;
+
+  return (
+    <Card
+      id={`resource-${doc.id}`}
+      className={`scroll-mt-24 min-h-[220px] h-full p-4 shadow-sm hover:shadow-md transition-shadow bg-white border border-gray-200 group flex flex-col gap-3 ${
+        canOpen ? "cursor-pointer" : "opacity-60"
+      }`}
+      onClick={canOpen ? () => onOpen(doc) : undefined}
+    >
+      <div className="relative h-24 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+        {canOpen && !isVideo ? (
+          <img
+            src={doc.signed_url!}
+            alt={doc.title}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : canOpen && isVideo ? (
+          <video
+            src={doc.signed_url!}
+            className="h-full w-full object-cover"
+            preload="metadata"
+            muted
+            playsInline
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <PreviewIcon className="h-8 w-8 text-gray-400" />
+          </div>
+        )}
+        {isVideo && canOpen ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+            <div className="rounded-full bg-black/50 p-1.5">
+              <Film className="h-4 w-4 text-white" />
+            </div>
+          </div>
+        ) : null}
+        {canOpen ? (
+          <button
+            type="button"
+            className="absolute right-1 top-1 rounded p-1 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-700 group-hover:opacity-100"
+            title="Share"
+            onClick={(e) => {
+              e.stopPropagation();
+              void onShare(doc);
+            }}
+          >
+            <Share2 className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+        <h3 className="font-semibold text-sm text-gray-900 leading-tight">{doc.title}</h3>
+        {doc.description?.trim() ? (
+          <p className="text-xs text-gray-600 line-clamp-2">{doc.description}</p>
+        ) : null}
+        {doc.file_name ? (
+          <p className="text-xs text-gray-500 truncate" title={doc.file_name}>
+            {doc.file_name}
+            {sizeLabel ? ` · ${sizeLabel}` : ""}
+          </p>
+        ) : null}
+        {copiedId === doc.id ? (
+          <p className="text-xs text-green-700">Link copied to clipboard</p>
+        ) : null}
+      </div>
+
+      <Badge variant="secondary" className="shrink-0 gap-1 text-xs bg-rose-100 text-rose-700">
+        {label}
+      </Badge>
+    </Card>
+  );
+}
+
 export function Resources() {
   const [documents, setDocuments] = useState<ApiDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,6 +258,7 @@ export function Resources() {
 
   const filtered = useMemo(() => {
     if (filter === "all") return documents;
+    if (filter === "media") return documents.filter((d) => isMediaKind(d.type.value));
     const allowed = FILTER_KINDS[filter];
     return documents.filter((d) => allowed.includes(d.type.value));
   }, [documents, filter]);
@@ -181,6 +286,37 @@ export function Resources() {
     const text = doc.file_name || doc.title;
     try {
       await navigator.clipboard.writeText(text);
+      setCopiedId(doc.id);
+      window.setTimeout(() => setCopiedId((id) => (id === doc.id ? null : id)), 2000);
+    } catch {
+      setCopiedId(null);
+    }
+  };
+
+  const shareMedia = async (doc: ApiDocument) => {
+    const url = doc.signed_url?.trim();
+    if (!url) {
+      setDownloadError(`"${doc.title}" is no longer available to share.`);
+      return;
+    }
+
+    setDownloadError(null);
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: doc.title,
+          text: doc.description?.trim() || doc.title,
+          url,
+        });
+        return;
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
       setCopiedId(doc.id);
       window.setTimeout(() => setCopiedId((id) => (id === doc.id ? null : id)), 2000);
     } catch {
@@ -248,9 +384,22 @@ export function Resources() {
           {documents.length === 0 ? "No resources yet." : "No items in this category."}
         </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-stretch">
           {filtered.map((doc) => {
             const kind = doc.type.value;
+
+            if (isMediaKind(kind)) {
+              return (
+                <MediaItemCard
+                  key={doc.id}
+                  doc={doc}
+                  copiedId={copiedId}
+                  onOpen={handleOpen}
+                  onShare={shareMedia}
+                />
+              );
+            }
+
             const config = typeConfig[kind] ?? typeConfig.document;
             const Icon = config.icon;
             const isLink = !!doc.link?.trim();
